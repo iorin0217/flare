@@ -257,6 +257,14 @@ def three_body_en_helper(ci1, ci2, r11, r22, r33, fi, fj, fdi, ls1, ls2, sig2):
 
 
 @njit
+def three_body_en_grad_helper(ci1, ci2, r11, r22, r33, fi, fj, fdi, ls1, ls2, ls4, sig2, sig3):
+    B = r11 * ci1 + r22 * ci2
+    D = r11 * r11 + r22 * r22 + r33 * r33
+
+    return grad_FE_helper(B, D, fi, fj, fdi, ls1, ls2, ls4, sig2, sig3)
+
+
+@njit
 def three_body_ee_perm(r11, r12, r13, r21, r22, r23, r31, r32, r33, c1, c2,
                        ei1, ei2, ej1, ej2, fi, fj, ls2, sig2):
     kern = 0
@@ -572,9 +580,109 @@ def three_body_grad_perm(r11, r12, r13, r21, r22, r23, r31, r32, r33, c1, c2,
     return kern, sig_derv, ls_derv
 
 
+@njit
+def three_body_grad_EE_perm(r11, r12, r13, r21, r22, r23, r31, r32, r33, c1, c2, ei1, ei2, ej1, ej2, fi, fj, ls1, ls4, sig2, sig3):
+
+    kern = 0
+    sig_derv = 0
+    ls_derv = 0
+
+    if (c1 == c2):
+        if (ei1 == ej1) and (ei2 == ej2):
+            D1 = r11 * r11 + r22 * r22 + r33 * r33
+            kern_term, sig_term, ls_term = grad_EE_helper(D1, fi, fj, ls1, ls4, sig2, sig3)
+            kern += kern_term
+            sig_derv += sig_term
+            ls_derv += ls_term
+        if (ei1 == ej2) and (ei2 == ej1):
+            D3 = r12 * r12 + r21 * r21 + r33 * r33
+            kern_term, sig_term, ls_term = grad_EE_helper(D3, fi, fj, ls1, ls4, sig2, sig3)
+            kern += kern_term
+            sig_derv += sig_term
+            ls_derv += ls_term
+    if (c1 == ej1):
+        if (ei1 == ej2) and (ei2 == c2):
+            D5 = r13 * r13 + r21 * r21 + r32 * r32
+            kern_term, sig_term, ls_term = grad_EE_helper(D5, fi, fj, ls1, ls4, sig2, sig3)
+            kern += kern_term
+            sig_derv += sig_term
+            ls_derv += ls_term
+        if (ei1 == c2) and (ei2 == ej2):
+            D2 = r11 * r11 + r23 * r23 + r32 * r32
+            kern_term, sig_term, ls_term = grad_EE_helper(D2, fi, fj, ls1, ls4, sig2, sig3)
+            kern += kern_term
+            sig_derv += sig_term
+            ls_derv += ls_term
+    if (c1 == ej2):
+        if (ei1 == ej1) and (ei2 == c2):
+            D6 = r13 * r13 + r22 * r22 + r31 * r31
+            kern_term, sig_term, ls_term = grad_EE_helper(D6, fi, fj, ls1, ls4, sig2, sig3)
+            kern += kern_term
+            sig_derv += sig_term
+            ls_derv += ls_term
+        if (ei1 == c2) and (ei2 == ej1):
+            D4 = r12 * r12 + r23 * r23 + r31 * r31
+            kern_term, sig_term, ls_term = grad_EE_helper(D4, fi, fj, ls1, ls4, sig2, sig3)
+            kern += kern_term
+            sig_derv += sig_term
+            ls_derv += ls_term
+
+    return kern, sig_derv, ls_derv
+
+
+@njit
+def three_body_grad_FE_perm(r11, r12, r13, r21, r22, r23, r31, r32, r33, c1, c2, ci1, ci2, ei1, ei2, ej1, ej2, fi, fj, fdi, ls1, ls2, ls4, sig2, sig3):
+
+    kern = 0
+    sig_derv = 0
+    ls_derv = 0
+
+    if (c1 == c2):
+        if (ei1 == ej1) and (ei2 == ej2):
+            kern_term, sig_term, ls_term = three_body_en_grad_helper(
+                ci1, ci2, r11, r22, r33, fi, fj, fdi, ls1, ls2, ls4, sig2, sig3)
+            kern += kern_term
+            sig_derv += sig_term
+            ls_derv += ls_term
+        if (ei1 == ej2) and (ei2 == ej1):
+            kern_term, sig_term, ls_term = three_body_en_grad_helper(
+                ci1, ci2, r12, r21, r33, fi, fj, fdi, ls1, ls2, ls4, sig2, sig3)
+            kern += kern_term
+            sig_derv += sig_term
+            ls_derv += ls_term
+    if (c1 == ej1):
+        if (ei1 == ej2) and (ei2 == c2):
+            kern_term, sig_term, ls_term = three_body_en_grad_helper(
+                ci1, ci2, r13, r21, r32, fi, fj, fdi, ls1, ls2, ls4, sig2, sig3)
+            kern += kern_term
+            sig_derv += sig_term
+            ls_derv += ls_term
+        if (ei1 == c2) and (ei2 == ej2):
+            kern_term, sig_term, ls_term = three_body_en_grad_helper(
+                ci1, ci2, r11, r23, r32, fi, fj, fdi, ls1, ls2, ls4, sig2, sig3)
+            kern += kern_term
+            sig_derv += sig_term
+            ls_derv += ls_term
+    if (c1 == ej2):
+        if (ei1 == ej1) and (ei2 == c2):
+            kern_term, sig_term, ls_term = three_body_en_grad_helper(
+                ci1, ci2, r13, r22, r31, fi, fj, fdi, ls1, ls2, ls4, sig2, sig3)
+            kern += kern_term
+            sig_derv += sig_term
+            ls_derv += ls_term
+        if (ei1 == c2) and (ei2 == ej1):
+            kern_term, sig_term, ls_term = three_body_en_grad_helper(
+                ci1, ci2, r12, r23, r31, fi, fj, fdi, ls1, ls2, ls4, sig2, sig3)
+            kern += kern_term
+            sig_derv += sig_term
+            ls_derv += ls_term
+
+    return kern, sig_derv, ls_derv
+
 # -----------------------------------------------------------------------------
 #                        many body helper functions
 # -----------------------------------------------------------------------------
+
 
 @njit
 def k_sq_exp_double_dev(q1, q2, sig, ls):
