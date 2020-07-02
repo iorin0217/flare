@@ -1390,3 +1390,327 @@ def get_like_grad_from_mats(ky_mat, hyp_mat, name):
         like_grad[n] = 0.5 * np.trace(np.matmul(like_mat, hyp_mat[n, :, :]))
 
     return like, like_grad
+
+# --------------------------------------------------------------------------
+#                        Ky and gradient
+# --------------------------------------------------------------------------
+
+
+def get_Ky_mat_and_grad(hyps: np.ndarray, name: str, force_grad_kernel: Callable,
+                        energy_grad_kernel: Callable, force_energy_grad_kernel: Callable,
+                        energy_noise, cutoffs=None, hyps_mask=None,
+                        n_cpus=1, n_sample=100):
+
+    training_data = _global_training_data[name]
+    training_structures = _global_training_structures[name]
+    size1 = len(training_data) * 3
+    size2 = len(training_structures)
+
+    _, non_noise_hyps, train_noise = obtain_noise_len(hyps, hyps_mask)
+
+    # Initialize Ky.
+    ky_mat = np.zeros((size1 + size2, size1 + size2))
+    grad_mat = np.zeros((non_noise_hyps, size1 + size2, size1 + size2))
+
+    # Assemble the full covariance matrix block-by-block.
+    force_block, force_grad_block = get_force_and_grad_block(hyps, name, force_grad_kernel, non_noise_hyps, cutoffs, hyps_mask,
+                                                             n_cpus, n_sample, train_noise)
+
+    energy_block, energy_grad_block = get_energy_and_grad_block(hyps, name, energy_grad_kernel, energy_noise, non_noise_hyps,
+                                                                cutoffs, hyps_mask, n_cpus, n_sample, train_noise)
+
+    force_energy_block, force_energy_grad_block = \
+        get_force_energy_and_grad_block(hyps, name, force_energy_grad_kernel, non_noise_hyps, cutoffs,
+                                        hyps_mask, n_cpus, n_sample, train_noise)
+
+    ky_mat[0:size1, 0:size1] = force_block
+    ky_mat[size1:, size1:] = energy_block
+    ky_mat[0:size1, size1:] = force_energy_block
+    ky_mat[size1:, 0:size1] = force_energy_block.transpose()
+
+    grad_mat[:, 0:size1, 0:size1] = force_grad_block
+    grad_mat[:, size1:, size1:] = energy_grad_block
+    grad_mat[:, 0:size1, size1:] = force_energy_grad_block
+    grad_mat[:, size1:, 0:size1] = force_energy_grad_block.transpose()
+
+    return grad_mat, ky_mat
+
+
+def get_force_and_grad_block(hyps: np.ndarray, name: str, grad_kernel, non_noise_hyps, cutoffs=None,
+                             hyps_mask=None, n_cpus=1, n_sample=100, train_noise=False):
+    """ parallel version of get_ky_mat
+    :param hyps: list of hyper-parameters
+    :param name: name of the gp instance.
+    :param kernel: function object of the kernel
+    :param cutoffs: The cutoff values used for the atomic environments
+    :type cutoffs: list of 2 float numbers
+    :param hyps_mask: dictionary used for multi-group hyperparmeters
+
+    :return: covariance matrix
+    """
+
+    training_data = _global_training_data[name]
+    size = len(training_data)
+    size3 = 3 * size
+
+    if (n_cpus is None):
+        n_cpus = mp.cpu_count()
+    if (n_cpus == 1):
+        k_mat, grad_mat = \
+            get_force_and_grad_block_pack(hyps, name, 0, size, 0, size, True, grad_kernel,
+                                          cutoffs, hyps_mask, non_noise_hyps)
+    else:
+        # initialize matrices
+        block_id, nbatch = partition_matrix(n_sample, size, n_cpus)
+        mult = 3
+
+        k_mat, grad_mat = \
+            parallel_matrix_grad_construction(get_force_and_grad_block_pack, hyps, name,
+                                              grad_kernel, cutoffs, hyps_mask, non_noise_hyps,
+                                              block_id, nbatch, size3, size3,
+                                              mult, mult)
+
+    sigma_n, _, __ = obtain_noise_len(hyps, hyps_mask)
+    force_block = k_mat
+    force_block += sigma_n ** 2 * np.eye(size3)
+
+    if (train_noise):
+        force_grad = np.zeros(
+            [grad_mat.shape[0] + 1, grad_mat.shape[1], grad_mat.shape[2]])
+        force_grad[:-1, :, :] = grad_mat
+        force_grad[-1, :, :] = np.eye(size3) * 2 * sigma_n
+    else:
+        force_grad = grad_mat
+
+    return force_block, force_grad
+
+
+def get_force_and_grad_block_pack(hyps: np.ndarray, name: str, s1: int, e1: int,
+                                  s2: int, e2: int, same: bool, grad_kernel, cutoffs,
+                                  hyps_mask, non_noise_hyps):
+    """ Compute covariance matrix element between set1 and set2
+    :param hyps: list of hyper-parameters
+    :param name: name of the gp instance.
+    :param same: whether the row and column are the same
+    :param kernel: function object of the kernel
+    :param cutoffs: The cutoff values used for the atomic environments
+    :type cutoffs: list of 2 float numbers
+    :param hyps_mask: dictionary used for multi-group hyperparmeters
+
+    :return: covariance matrix
+    """
+
+    # initialize matrices
+    training_data = _global_training_data[name]
+    size1 = (e1 - s1) * 3
+    size2 = (e2 - s2) * 3
+    force_block = np.zeros([size1, size2])
+    grad_block = np.zeros([non_noise_hyps, size1, size2])
+
+    # ds = [1, 2, 3]
+
+    # calculate elements
+    # args = from_mask_to_args(hyps, cutoffs, hyps_mask)
+
+    for m_index in range(size1):
+        x_1 = training_data[int(math.floor(m_index / 3)) + s1]
+        if (same):
+            lowbound = m_index
+        else:
+            lowbound = 0
+        for n_index in range(lowbound, size2):
+            x_2 = training_data[int(math.floor(n_index / 3)) + s2]
+            kern_curr, grad_curr = grad_kernel(x_1, x_2)
+            # store kernel value
+            force_block[m_index, n_index] = kern_curr
+            grad_block[:, m_index, n_index] = grad_curr
+            if (same):
+                force_block[n_index, m_index] = kern_curr
+                grad_block[:, n_index, m_index] = grad_curr
+
+    return force_block, grad_block
+
+
+def parallel_matrix_grad_construction(pack_function, hyps, name, grad_kernel, cutoffs, hyps_mask, non_noise_hyps, block_id, nbatch, size1, size2, m1, m2, symm=True):
+    result_queue = mp.Queue()
+    children = []
+    for wid in range(nbatch):
+        s1, e1, s2, e2 = block_id[wid]
+        children.append(mp.Process(target=queue_wrapper,
+                                   args=(result_queue, wid, pack_function,
+                                         (hyps, name, s1, e1, s2, e2, s1 == s2,
+                                          grad_kernel, cutoffs, hyps_mask))))
+
+    # Run child processes.
+    for c in children:
+        c.start()
+
+    # Wait for all results to arrive.
+    matrix1 = np.zeros((size1, size2))
+    matrix2 = np.zeros((non_noise_hyps, size1, size2))
+    for _ in range(nbatch):
+        wid, result_chunk = result_queue.get(block=True)
+        s1, e1, s2, e2 = block_id[wid]
+        matrix1[s1 * m1:e1 * m1,
+                s2 * m2:e2 * m2] = result_chunk[0]
+        matrix2[:, s1 * m1:e1 * m1,
+                s2 * m2:e2 * m2] = result_chunk[1]
+        # Note that the force/energy block is not symmetric; in this case
+        # symm is False.
+        if ((s1 != s2) and (symm is True)):
+            matrix1[s2 * m2:e2 * m2, s1 * m1:e1 * m1] = result_chunk[0].T
+            matrix2[:, s2 * m2:e2 * m2, s1 * m1:e1 * m1] = result_chunk[1].T
+
+    # Join child processes (clean up zombies).
+    for c in children:
+        c.join()
+
+    # matrix manipulation
+    del result_queue
+    del children
+
+    return matrix1, matrix2
+
+
+def get_energy_and_grad_block(hyps: np.ndarray, name: str, grad_kernel, energy_noise, non_noise_hyps, cutoffs=None, hyps_mask=None, n_cpus=1, n_sample=100, train_noise=False):
+    training_structures = _global_training_structures[name]
+    size = len(training_structures)
+
+    if (n_cpus is None):
+        n_cpus = mp.cpu_count()
+    if (n_cpus == 1):
+        k_mat, grad_mat = \
+            get_energy_and_grad_block_pack(hyps, name, 0, size, 0, size, True, grad_kernel,
+                                           cutoffs, hyps_mask, non_noise_hyps)
+    else:
+        block_id, nbatch = partition_matrix(n_sample, size, n_cpus)
+        mult = 1
+
+        k_mat, grad_mat = \
+            parallel_matrix_grad_construction(get_energy_and_grad_block_pack, hyps, name, grad_kernel,
+                                              cutoffs, hyps_mask, non_noise_hyps, block_id, nbatch, size, size, mult, mult)
+
+    energy_block = k_mat
+    energy_block += (energy_noise ** 2) * np.eye(size)
+
+    if (train_noise):
+        energy_grad = np.zeros(
+            [grad_mat.shape[0] + 1, grad_mat.shape[1], grad_mat.shape[2]])
+        energy_grad[:-1, :, :] = grad_mat
+        energy_grad[-1, :, :] = np.eye(size) * 2 * energy_noise
+    else:
+        energy_grad = grad_mat
+
+    return energy_block, energy_grad
+
+
+def get_energy_and_grad_block_pack(hyps: np.ndarray, name: str, s1: int, e1: int,
+                                   s2: int, e2: int, same: bool, grad_kernel, cutoffs,
+                                   hyps_mask, non_noise_hyps):
+
+    # initialize matrices
+    training_structures = _global_training_structures[name]
+    size1 = e1 - s1
+    size2 = e2 - s2
+    energy_block = np.zeros([size1, size2])
+    grad_block = np.zeros([non_noise_hyps, size1, size2])
+
+    # calculate elements
+    # args = from_mask_to_args(hyps, cutoffs, hyps_mask)
+
+    for m_index in range(size1):
+        struc_1 = training_structures[m_index + s1]
+        if (same):
+            lowbound = m_index
+        else:
+            lowbound = 0
+
+        for n_index in range(lowbound, size2):
+            struc_2 = training_structures[n_index + s2]
+
+            # Loop over environments in both structures to compute the
+            # energy/energy kernel.
+            kern_curr = 0
+            grad_curr = 0
+            for environment_1 in struc_1:
+                for environment_2 in struc_2:
+                    kern_tmp, grad_tmp = grad_kernel(
+                        environment_1, environment_2)
+                    kern_curr += kern_tmp
+                    grad_curr += grad_tmp
+
+            # Store kernel value.
+            energy_block[m_index, n_index] = kern_curr
+            grad_block[:, m_index, n_index] = grad_curr
+            if (same):
+                energy_block[n_index, m_index] = kern_curr
+                grad_block[:, n_index, m_index] = grad_curr
+
+    return energy_block, grad_block
+
+
+def get_force_energy_and_grad_block(hyps: np.ndarray, name: str, grad_kernel, non_noise_hyps, cutoffs=None, hyps_mask=None, n_cpus=1, n_sample=100, train_noise=False):
+    training_data = _global_training_data[name]
+    training_structures = _global_training_structures[name]
+    size1 = len(training_data) * 3
+    size2 = len(training_structures)
+    size3 = len(training_data)
+
+    if (n_cpus is None):
+        n_cpus = mp.cpu_count()
+    if (n_cpus == 1):
+        force_energy_block, force_energy_grad_block = \
+            get_force_energy_and_grad_block_pack(hyps, name, 0, size3, 0, size2, True,
+                                                 grad_kernel, cutoffs, hyps_mask, non_noise_hyps)
+    else:
+        # initialize matrices
+        block_id, nbatch = \
+            partition_force_energy_block(n_sample, size3, size2, n_cpus)
+        m1 = 3  # 3 force components per environment
+        m2 = 1  # 1 energy per structure
+
+        force_energy_block, force_energy_grad_block = \
+            parallel_matrix_grad_construction(get_force_energy_block_pack, hyps,
+                                              name, grad_kernel, cutoffs, hyps_mask, non_noise_hyps,
+                                              block_id, nbatch, size1, size2, m1,
+                                              m2, symm=False)
+
+    return force_energy_block, force_energy_grad_block
+
+
+def get_force_energy_and_grad_block_pack(hyps: np.ndarray, name: str, s1: int,
+                                         e1: int, s2: int, e2: int, same: bool, grad_kernel,
+                                         cutoffs, hyps_mask, non_noise_hyps):
+    # initialize matrices
+    training_data = _global_training_data[name]
+    training_structures = _global_training_structures[name]
+    size1 = (e1 - s1) * 3
+    size2 = e2 - s2
+    force_energy_block = np.zeros([size1, size2])
+    grad_block = np.zeros([non_noise_hyps, size1, size2])
+
+    # ds = [1, 2, 3]
+
+    # calculate elements
+    # args = from_mask_to_args(hyps, cutoffs, hyps_mask)
+
+    for m_index in range(size1):
+        environment_1 = training_data[int(math.floor(m_index / 3)) + s1]
+        # d_1 = ds[m_index % 3]
+
+        for n_index in range(size2):
+            structure = training_structures[n_index + s2]
+
+            # Loop over environments in the training structure.
+            kern_curr = 0
+            grad_curr = 0
+            for environment_2 in structure:
+                kern_tmp, grad_tmp = grad_kernel(environment_1, environment_2)
+                kern_curr += kern_tmp
+                grad_curr += grad_tmp
+
+            # store kernel value
+            force_energy_block[m_index, n_index] = kern_curr
+            grad_block[m_index, n_index] = grad_curr
+
+    return force_energy_block, grad_block
