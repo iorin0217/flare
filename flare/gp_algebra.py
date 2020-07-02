@@ -1714,3 +1714,95 @@ def get_force_energy_and_grad_block_pack(hyps: np.ndarray, name: str, s1: int,
             grad_block[m_index, n_index] = grad_curr
 
     return force_energy_block, grad_block
+
+# --------------------------------------------------------------------------
+#                  Computing the energy and force likelihood grad
+# --------------------------------------------------------------------------
+
+
+def get_neg_like_grad_with_E(hyps: np.ndarray, name: str,
+                             force_grad_kernel, energy_grad_kernel, force_energy_grad_kernel, energy_noise, logger=None,
+                             cutoffs=None, hyps_mask=None,
+                             n_cpus=1, n_sample=100):
+    """compute the log likelihood and its gradients
+
+    :param hyps: list of hyper-parameters
+    :type hyps: np.ndarray
+    :param name: name of the gp instance.
+    :param kernel_grad: function object of the kernel gradient
+    :param output: Output object for dumping every hyper-parameter
+                   sets computed
+    :type output: logger
+    :param cutoffs: The cutoff values used for the atomic environments
+    :type cutoffs: list of 2 float numbers
+    :param hyps_mask: dictionary used for multi-group hyperparmeters
+    :param n_cpus: number of cpus to use.
+    :param n_sample: the size of block for matrix to compute
+
+    :return: float, np.array
+    """
+
+    time0 = time.time()
+
+    hyp_mat, ky_mat = \
+        get_Ky_mat_and_grad(hyps, name, force_grad_kernel, energy_grad_kernel, force_energy_grad_kernel,
+                            energy_noise, cutoffs=cutoffs, hyps_mask=hyps_mask, n_cpus=n_cpus, n_sample=n_sample)
+
+    logger.debug(f"get_ky_and_hyp {time.time()-time0}")
+
+    time0 = time.time()
+
+    like, like_grad = \
+        get_like_grad_from_mats_with_E(ky_mat, hyp_mat, name)
+
+    logger.debug(f"get_like_grad_from_mats {time.time()-time0}")
+
+    logger.debug('')
+    logger.info(f'Hyperparameters: {list(hyps)}')
+    logger.info(f'Likelihood: {like}')
+    logger.info(f'Likelihood Gradient: {list(like_grad)}')
+
+    return -like, -like_grad
+
+
+def get_like_grad_from_mats_with_E(ky_mat, hyp_mat, name):
+    """compute the gradient of likelihood to hyper-parameters
+    from covariance matrix and its gradient
+
+    :param ky_mat: covariance matrix
+    :type ky_mat: np.array
+    :param hyp_mat: dky/d(hyper parameter) matrix
+    :type hyp_mat: np.array
+    :param name: name of the gp instance.
+
+    :return: float, list. the likelihood and its gradients
+    """
+
+    number_of_hyps = hyp_mat.shape[0]
+
+    # catch linear algebra errors
+    try:
+        ky_mat_inv = np.linalg.inv(ky_mat)
+        l_mat = np.linalg.cholesky(ky_mat)
+    except np.linalg.LinAlgError:
+        return -1e8, np.zeros(number_of_hyps)
+
+    force_labels = _global_training_labels[name]
+    energy_labels = _global_energy_labels[name]
+    labels = np.concatenate((force_labels, energy_labels))
+
+    alpha = np.matmul(ky_mat_inv, labels)
+    alpha_mat = np.matmul(alpha.reshape(-1, 1), alpha.reshape(1, -1))
+    like_mat = alpha_mat - ky_mat_inv
+
+    # calculate likelihood
+    like = (-0.5 * np.matmul(labels, alpha) -
+            np.sum(np.log(np.diagonal(l_mat))) -
+            math.log(2 * np.pi) * ky_mat.shape[1] / 2)
+
+    # calculate likelihood gradient
+    like_grad = np.zeros(number_of_hyps)
+    for n in range(number_of_hyps):
+        like_grad[n] = 0.5 * np.trace(np.matmul(like_mat, hyp_mat[n, :, :]))
+
+    return like, like_grad

@@ -20,9 +20,9 @@ from flare.gp_algebra import get_like_from_mats, get_neg_like_grad, \
     force_force_vector, energy_force_vector, get_force_block, \
     get_ky_mat_update, _global_training_data, _global_training_labels, \
     _global_training_structures, _global_energy_labels, get_Ky_mat, \
-    get_kernel_vector, en_kern_vec, efs_kern_vec
+    get_kernel_vector, en_kern_vec, efs_kern_vec, get_neg_like_grad_with_E
 from flare.kernels.utils import str_to_kernel_set, from_mask_to_args, \
-    kernel_str_to_array
+    kernel_str_to_array, str_to_kernel_set_with_E
 from flare.output import Output, set_logger
 from flare.parameters import Parameters
 from flare.struc import Structure
@@ -69,7 +69,7 @@ class GaussianProcess:
                  per_atom_par: bool = True, n_cpus: int = 1,
                  n_sample: int = 100, output: Output = None,
                  name="default_gp",
-                 energy_noise: float = 0.01, **kwargs,):
+                 energy_noise: float = 0.01, with_E: bool = False, **kwargs,):
         """Initialize GP parameters and training data."""
 
         # load arguments into attributes
@@ -99,16 +99,16 @@ class GaussianProcess:
         # ------------  "computed" attributes ------------
 
         if self.output is None:
-            self.logger_name = self.name+"GaussianProcess"
+            self.logger_name = self.name + "GaussianProcess"
             set_logger(self.logger_name, stream=True,
                        fileout_name=None, verbose="info")
         else:
-            self.logger_name = self.output.basename+'log'
+            self.logger_name = self.output.basename + 'log'
 
         if self.hyps is None:
             # If no hyperparameters are passed in, assume 2 hyps for each
             # cutoff, plus one noise hyperparameter, and use a guess value
-            self.hyps = np.array([0.1]*(1+2*len(self.kernels)))
+            self.hyps = np.array([0.1] * (1 + 2 * len(self.kernels)))
         else:
             self.hyps = np.array(self.hyps, dtype=np.float64)
 
@@ -122,6 +122,12 @@ class GaussianProcess:
         self.efs_force_kernel = efs_f
         self.efs_self_kernel = efs_self
         self.kernels = kernel_str_to_array(kernel.__name__)
+        if with_E:
+            fg, eg, feg = str_to_kernel_set_with_E(
+                self.kernels, self.component, self.hyps_mask)
+            self.force_grad = fg
+            self.energy_grad = eg
+            self.force_energy_grad = feg
 
         # parallelization
         if self.parallel:
@@ -171,13 +177,12 @@ class GaussianProcess:
 
         if self.logger_name is None:
             if self.output is None:
-                self.logger_name = self.name+"GaussianProcess"
+                self.logger_name = self.name + "GaussianProcess"
                 set_logger(self.logger_name, stream=True,
                            fileout_name=None, verbose="info")
             else:
-                self.logger_name = self.output.basename+'log'
+                self.logger_name = self.output.basename + 'log'
         logger = logging.getLogger(self.logger_name)
-
 
         # check whether it's be loaded before
         loaded = False
@@ -196,14 +201,14 @@ class GaussianProcess:
                 time.sleep(random())
                 self.name = f'{base}_{count}'
                 logger.debug("Specified GP name is present in global memory; "
-                       "Attempting to rename the "
-                            f"GP instance to {self.name}")
+                             "Attempting to rename the "
+                             f"GP instance to {self.name}")
                 count += 1
             if (self.name in _global_training_labels):
                 milliseconds = int(round(time.time() * 1000) % 10000000)
                 self.name = f"{base}_{milliseconds}"
                 logger.debug("Specified GP name still present in global memory: "
-                       f"renaming the gp instance to {self.name}")
+                             f"renaming the gp instance to {self.name}")
             logger.debug(f"Final name of the gp instance is {self.name}")
 
         self.sync_data()
@@ -364,7 +369,7 @@ class GaussianProcess:
             except np.linalg.LinAlgError:
                 logger = logging.getLogger(self.logger_name)
                 logger.warning("Algorithm for L-BFGS-B failed. Changing to "
-                          "BFGS for remainder of run.")
+                               "BFGS for remainder of run.")
                 self.opt_algorithm = 'BFGS'
 
         if custom_bounds is not None:
@@ -376,6 +381,94 @@ class GaussianProcess:
 
         elif self.opt_algorithm == 'BFGS':
             res = minimize(get_neg_like_grad, x_0, args,
+                           method='BFGS', jac=True,
+                           options={'disp': disp, 'gtol': grad_tol,
+                                    'maxiter': self.maxiter})
+
+        if res is None:
+            raise RuntimeError("Optimization failed for some reason.")
+        self.hyps = res.x
+        self.set_L_alpha()
+        self.likelihood = -res.fun
+        self.likelihood_gradient = -res.jac
+
+        return res
+
+    def train_with_E(self, logger=None, custom_bounds=None,
+                     grad_tol: float = 1e-4,
+                     x_tol: float = 1e-5,
+                     line_steps: int = 20,
+                     print_progress: bool = False):
+        """Train Gaussian Process model on training data. Tunes the
+        hyperparameters to maximize the likelihood, then computes L and alpha
+        (related to the covariance matrix of the training set).
+
+        Args:
+            logger (logging.logger): logger object specifying where to write the
+                progress of the optimization.
+            custom_bounds (np.ndarray): Custom bounds on the hyperparameters.
+            grad_tol (float): Tolerance of the hyperparameter gradient that
+                determines when hyperparameter optimization is terminated.
+            x_tol (float): Tolerance on the x values used to decide when
+                Nelder-Mead hyperparameter optimization is terminated.
+            line_steps (int): Maximum number of line steps for L-BFGS
+                hyperparameter optimization.
+        """
+
+        verbose = "warning"
+        if print_progress:
+            verbose = "info"
+        if logger is None:
+            logger = set_logger("gp_algebra", stream=True,
+                                fileout_name="log.gp_algebra",
+                                verbose=verbose)
+
+        disp = print_progress
+
+        if len(self.training_data) == 0 or len(self.training_labels) == 0:
+            raise Warning("You are attempting to train a GP with no "
+                          "training data. Add environments and forces "
+                          "to the GP and try again.")
+
+        x_0 = self.hyps
+
+        args = (self.name, self.force_grad, self.energy_grad, self.force_energy_grad, logger,
+                self.cutoffs, self.hyps_mask,
+                self.n_cpus, self.n_sample)
+
+        res = None
+
+        if self.opt_algorithm == 'L-BFGS-B':
+
+            # bound signal noise below to avoid overfitting
+            if self.bounds is None:
+                bounds = np.array([(1e-6, np.inf)] * len(x_0))
+                bounds[-1, 0] = 1e-3
+            else:
+                bounds = self.bounds
+
+            # Catch linear algebra errors and switch to BFGS if necessary
+            try:
+                res = minimize(get_neg_like_grad_with_E, x_0, args,
+                               method='L-BFGS-B', jac=True, bounds=bounds,
+                               options={'disp': disp, 'gtol': grad_tol,
+                                        'maxls': line_steps,
+                                        'maxiter': self.maxiter})
+            except np.linalg.LinAlgError:
+                logger = logging.getLogger(self.logger_name)
+                logger.warning("Algorithm for L-BFGS-B failed. Changing to "
+                               "BFGS for remainder of run.")
+                self.opt_algorithm = 'BFGS'
+
+        if custom_bounds is not None:
+            res = minimize(get_neg_like_grad_with_E, x_0, args,
+                           method='L-BFGS-B', jac=True, bounds=custom_bounds,
+                           options={'disp': disp, 'gtol': grad_tol,
+                                    'maxls': line_steps,
+                                    'maxiter': self.maxiter})
+
+        elif self.opt_algorithm == 'BFGS':
+            res = minimize(get_neg_like_grad_with_E, x_0, args,
                            method='BFGS', jac=True,
                            options={'disp': disp, 'gtol': grad_tol,
                                     'maxiter': self.maxiter})
@@ -768,7 +861,6 @@ class GaussianProcess:
             self.ky_mat_inv = self.l_mat_inv.T @ self.l_mat_inv
             self.alpha = np.matmul(self.ky_mat_inv, self.all_labels)
 
-
     def adjust_cutoffs(self, new_cutoffs: Union[list, tuple, 'np.ndarray'],
                        reset_L_alpha=True, train=True, new_hyps_mask=None):
         """
@@ -811,8 +903,8 @@ class GaussianProcess:
             self.train()
 
     def remove_force_data(self, indexes: Union[int, List[int]],
-                          update_matrices: bool = True)->Tuple[List[Structure],
-                                                              List['ndarray']]:
+                          update_matrices: bool = True) -> Tuple[List[Structure],
+                                                                 List['ndarray']]:
         """
         Remove force components from the model. Convenience function which
         deletes individual data points.
@@ -876,7 +968,7 @@ class GaussianProcess:
         they are larger and loading them in takes longer (by setting up a
         new GP from the specifications). Pickled files can be faster to
         read & write, and they take up less memory.
-        
+
         Args:
             name (str): Output name.
             format (str): Output format.
@@ -900,7 +992,7 @@ class GaussianProcess:
 
         # Automatically detect output format from name variable
 
-        for detect in ['json','pickle','binary']:
+        for detect in ['json', 'pickle', 'binary']:
             if detect in name.lower():
                 format = detect
                 break
@@ -968,7 +1060,7 @@ class GaussianProcess:
                         gp_model.l_mat = None
                         gp_model.alpha = None
                         gp_model.ky_mat_inv = None
-                        Warning("the covariance matrices are not loaded" \
+                        Warning("the covariance matrices are not loaded"
                                 f"it can take extra long time to recompute")
 
         else:

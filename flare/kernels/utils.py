@@ -17,6 +17,16 @@ from_grad_to_mask(grad, hyps_mask) converts the gradient matrix to the actual
 """
 
 
+def str_to_kernel_set_with_E(kernels: list = ['twobody', 'threebody'],
+                             component: str = "sc",
+                             hyps_mask: dict = None):
+    """
+    now only "2+3mc" is supported
+    """
+    stk = mc_simple._str_to_kernel
+    return stk['2+3_force_grad'], stk['2+3_energy_grad'], stk['2+3_force_energy_grad']
+
+
 def str_to_kernel_set(kernels: list = ['twobody', 'threebody'],
                       component: str = "sc",
                       hyps_mask: dict = None):
@@ -85,7 +95,6 @@ def str_to_kernel_set(kernels: list = ['twobody', 'threebody'],
     return stk[prefix], stk[prefix + '_grad'], stk[prefix + '_en'], \
         stk[prefix + '_force_en'], stk[prefix+'_efs_energy'], \
         stk[prefix + '_efs_force'], stk[prefix + '_efs_self']
-
 
 
 def from_mask_to_args(hyps, cutoffs, hyps_mask=None):
