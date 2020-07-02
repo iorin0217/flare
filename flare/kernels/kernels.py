@@ -79,7 +79,7 @@ def grad_EE_helper(D, fi, fj, ls1, ls4, sig2, sig3):
     Z = P * Y
     AA = sig3 * Y
 
-    return Y, Z, AA
+    return Y, AA, Z
 
 
 @njit
@@ -96,7 +96,7 @@ def grad_FE_helper(B, D, fi, fj, fdi, ls1, ls2, ls4, sig2, sig3):
     AC = -P * fdi * fj
     AD = sig2 * (AB + AC) * E
 
-    return I, AD, AE
+    return I, AE, AD
 
 
 @njit
@@ -590,39 +590,45 @@ def three_body_grad_EE_perm(r11, r12, r13, r21, r22, r23, r31, r32, r33, c1, c2,
     if (c1 == c2):
         if (ei1 == ej1) and (ei2 == ej2):
             D1 = r11 * r11 + r22 * r22 + r33 * r33
-            kern_term, sig_term, ls_term = grad_EE_helper(D1, fi, fj, ls1, ls4, sig2, sig3)
+            kern_term, sig_term, ls_term = grad_EE_helper(
+                D1, fi, fj, ls1, ls4, sig2, sig3)
             kern += kern_term
             sig_derv += sig_term
             ls_derv += ls_term
         if (ei1 == ej2) and (ei2 == ej1):
             D3 = r12 * r12 + r21 * r21 + r33 * r33
-            kern_term, sig_term, ls_term = grad_EE_helper(D3, fi, fj, ls1, ls4, sig2, sig3)
+            kern_term, sig_term, ls_term = grad_EE_helper(
+                D3, fi, fj, ls1, ls4, sig2, sig3)
             kern += kern_term
             sig_derv += sig_term
             ls_derv += ls_term
     if (c1 == ej1):
         if (ei1 == ej2) and (ei2 == c2):
             D5 = r13 * r13 + r21 * r21 + r32 * r32
-            kern_term, sig_term, ls_term = grad_EE_helper(D5, fi, fj, ls1, ls4, sig2, sig3)
+            kern_term, sig_term, ls_term = grad_EE_helper(
+                D5, fi, fj, ls1, ls4, sig2, sig3)
             kern += kern_term
             sig_derv += sig_term
             ls_derv += ls_term
         if (ei1 == c2) and (ei2 == ej2):
             D2 = r11 * r11 + r23 * r23 + r32 * r32
-            kern_term, sig_term, ls_term = grad_EE_helper(D2, fi, fj, ls1, ls4, sig2, sig3)
+            kern_term, sig_term, ls_term = grad_EE_helper(
+                D2, fi, fj, ls1, ls4, sig2, sig3)
             kern += kern_term
             sig_derv += sig_term
             ls_derv += ls_term
     if (c1 == ej2):
         if (ei1 == ej1) and (ei2 == c2):
             D6 = r13 * r13 + r22 * r22 + r31 * r31
-            kern_term, sig_term, ls_term = grad_EE_helper(D6, fi, fj, ls1, ls4, sig2, sig3)
+            kern_term, sig_term, ls_term = grad_EE_helper(
+                D6, fi, fj, ls1, ls4, sig2, sig3)
             kern += kern_term
             sig_derv += sig_term
             ls_derv += ls_term
         if (ei1 == c2) and (ei2 == ej1):
             D4 = r12 * r12 + r23 * r23 + r31 * r31
-            kern_term, sig_term, ls_term = grad_EE_helper(D4, fi, fj, ls1, ls4, sig2, sig3)
+            kern_term, sig_term, ls_term = grad_EE_helper(
+                D4, fi, fj, ls1, ls4, sig2, sig3)
             kern += kern_term
             sig_derv += sig_term
             ls_derv += ls_term

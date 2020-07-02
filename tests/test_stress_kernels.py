@@ -211,6 +211,7 @@ def test_force_force(struc_envs, force_envs, kernel):
             < threshold).all(), \
         'Your force/force kernel is wrong.'
 
+
 @pytest.mark.parametrize('kernel', kernel_list)
 def test_stress_force(struc_envs, stress_envs, force_envs, kernel):
     """Check that the stress/force kernel is implemented correctly."""
@@ -363,3 +364,92 @@ def test_efs_self(struc_envs, kernel):
     assert(np.abs(e1 - e2) < threshold)
     assert((np.abs(f1 - np.diag(f2)) < threshold).all())
     assert((np.abs(s1 - np.diag(s2)) < threshold).all())
+
+
+@pytest.mark.parametrize('kernel', kernel_list)
+def test_force_energy_grad(struc_envs, kernel):
+    """Check that the force/energy gradient kernel is implemented correctly."""
+
+    perturbed_env = struc_envs[0][0]
+    for m in range(len(struc_envs[1])):
+        force_en_exact = kernel.force_energy(perturbed_env, struc_envs[1][m])
+
+        # Check force/energy of force/energy gradient.
+        force_en_gradient = kernel.force_energy_gradient(
+            perturbed_env, struc_envs[1][m])
+
+        assert (np.abs(force_en_exact - force_en_gradient[0]) < threshold).all(
+        ), 'The force/energy of force/energy gradient is wrong.'
+
+        # Perturb signal variance.
+        kernel.signal_variance = signal_variance + delta
+        force_sig_up = kernel.force_energy(perturbed_env, struc_envs[1][m])
+
+        kernel.signal_variance = signal_variance - delta
+        force_sig_down = kernel.force_energy(perturbed_env, struc_envs[1][m])
+
+        sig_val = (force_sig_up - force_sig_down) / (2 * delta)
+
+        # Perturb length scale.
+        kernel.signal_variance = signal_variance
+        kernel.length_scale = length_scale + delta
+        force_ls_up = kernel.force_energy(perturbed_env, struc_envs[1][m])
+
+        kernel.length_scale = length_scale - delta
+        force_ls_down = kernel.force_energy(perturbed_env, struc_envs[1][m])
+
+        ls_val = (force_ls_up - force_ls_down) / (2 * delta)
+
+        assert (np.abs(sig_val - force_en_gradient[1][0]) < threshold).all(
+        ), 'The force/energy sigma gradient is wrong.'
+
+        assert (np.abs(ls_val - force_en_gradient[1][1]) < threshold).all(
+        ), 'The force/energy ls gradient is wrong.'
+
+
+@pytest.mark.parametrize('kernel', kernel_list)
+def test_energy_energy_gradient(struc_envs, kernel):
+    """Check that the energy/energy gradient kernel is implemented correctly."""
+
+    test_env_1 = struc_envs[0][0]
+    test_env_2 = struc_envs[1][0]
+
+    en_en_exact = kernel.energy_energy(test_env_1, test_env_2)
+    print("en_en_exact")
+    print(en_en_exact)
+
+    en_en_gradient = kernel.energy_energy_gradient(test_env_1, test_env_2)
+    print("en_en_gradient")
+    print(en_en_gradient)
+
+    assert np.abs(
+        en_en_exact - en_en_gradient[0]) < threshold, 'The energy/energy of energy/energy gradient is wrong.'
+
+    # Perturb signal variance.
+    kernel.signal_variance = signal_variance + delta
+    force_sig_up = kernel.energy_energy(test_env_1, test_env_2)
+
+    kernel.signal_variance = signal_variance - delta
+    force_sig_down = kernel.energy_energy(test_env_1, test_env_2)
+
+    sig_val = (force_sig_up - force_sig_down) / (2 * delta)
+    print("sig_val")
+    print(sig_val)
+
+    # Perturb length scale.
+    kernel.signal_variance = signal_variance
+    kernel.length_scale = length_scale + delta
+    force_ls_up = kernel.energy_energy(test_env_1, test_env_2)
+
+    kernel.length_scale = length_scale - delta
+    force_ls_down = kernel.energy_energy(test_env_1, test_env_2)
+
+    ls_val = (force_ls_up - force_ls_down) / (2 * delta)
+    print("ls_val")
+    print(ls_val)
+
+    assert np.abs(
+        sig_val - en_en_gradient[1][0]) < threshold, 'The energy/energy sigma gradient is wrong.'
+
+    assert np.abs(
+        ls_val - en_en_gradient[1][1]) < threshold, 'The energy/energy ls gradient is wrong.'
