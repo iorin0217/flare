@@ -1,6 +1,6 @@
 import numpy as np
 from flare.kernels.kernels import force_helper, force_energy_helper, \
-    grad_helper
+    grad_helper, grad_EE_helper, grad_FE_helper
 from numba import njit
 from flare.env import AtomicEnvironment
 from typing import Callable
@@ -46,6 +46,16 @@ class TwoBodyKernel:
         args = self.get_args(env1, env2)
         return force_force_gradient(*args)
 
+    def energy_energy_gradient(self, env1: AtomicEnvironment,
+                               env2: AtomicEnvironment):
+        args = self.get_args(env1, env2)
+        return energy_energy_gradient(*args)
+
+    def force_energy_gradient(self, env1: AtomicEnvironment,
+                              env2: AtomicEnvironment):
+        args = self.get_args(env1, env2)
+        return force_energy_gradient(*args)
+
     def efs_energy(self, env1: AtomicEnvironment, env2: AtomicEnvironment):
         args = self.get_args(env1, env2)
         return efs_energy(*args)
@@ -64,6 +74,7 @@ class TwoBodyKernel:
                 env2.bond_array_2, env2.ctype, env2.etypes,
                 self.signal_variance, self.length_scale,
                 self.cutoff, self.cutoff_func)
+
 
 @njit
 def energy_energy(bond_array_1, c1, etypes1, bond_array_2, c2, etypes2,
@@ -526,6 +537,136 @@ def force_force_gradient(bond_array_1, c1, etypes1, bond_array_2, c2, etypes2,
                         kernel_grad[1, d1, d2] += ls_term
 
     return kernel_matrix, kernel_grad
+
+
+@njit
+def energy_energy_gradient(bond_array_1, c1, etypes1, bond_array_2, c2, etypes2,
+                           sig, ls, r_cut, cutoff_func):
+    """2-body multi-element kernel between two force components and its
+    gradient with respect to the hyperparameters.
+
+    Args:
+        bond_array_1 (np.ndarray): 2-body bond array of the first local
+            environment.
+        c1 (int): Species of the central atom of the first local environment.
+        etypes1 (np.ndarray): Species of atoms in the first local
+            environment.
+        bond_array_2 (np.ndarray): 2-body bond array of the second local
+            environment.
+        c2 (int): Species of the central atom of the second local environment.
+        etypes2 (np.ndarray): Species of atoms in the second local
+            environment.
+        sig (float): 2-body signal variance hyperparameter.
+        ls (float): 2-body length scale hyperparameter.
+        r_cut (float): 2-body cutoff radius.
+        cutoff_func (Callable): Cutoff function.
+
+    Returns:
+        (float, float):
+            Value of the 2-body kernel and its gradient with respect to the
+            hyperparameters.
+    """
+
+    kern = 0
+    kern_grad = np.zeros(2)
+
+    ls1 = 1 / (2 * ls * ls)
+    ls4 = 1 / (ls * ls * ls)
+
+    sig2 = sig * sig
+    sig3 = 2 * sig
+
+    for m in range(bond_array_1.shape[0]):
+        ri = bond_array_1[m, 0]
+        fi, _ = cutoff_func(r_cut, ri, 0)
+        e1 = etypes1[m]
+
+        for n in range(bond_array_2.shape[0]):
+            e2 = etypes2[n]
+
+            # check if bonds agree
+            if (c1 == c2 and e1 == e2) or (c1 == e2 and c2 == e1):
+                rj = bond_array_2[n, 0]
+                fj, _ = cutoff_func(r_cut, rj, 0)
+                r11 = ri - rj
+                D = r11 * r11
+
+                kern_term, sig_term, ls_term = \
+                    grad_EE_helper(D, fi, fj, ls1, ls4, sig2, sig3)
+
+                kern += kern_term
+                kern_grad[0] += sig_term
+                kern_grad[1] += ls_term
+
+    return kern / 4, kern_grad / 4
+
+
+@njit
+def force_energy_gradient(bond_array_1, c1, etypes1, bond_array_2, c2, etypes2,
+                          sig, ls, r_cut, cutoff_func):
+    """2-body multi-element kernel between two force components and its
+    gradient with respect to the hyperparameters.
+
+    Args:
+        bond_array_1 (np.ndarray): 2-body bond array of the first local
+            environment.
+        c1 (int): Species of the central atom of the first local environment.
+        etypes1 (np.ndarray): Species of atoms in the first local
+            environment.
+        bond_array_2 (np.ndarray): 2-body bond array of the second local
+            environment.
+        c2 (int): Species of the central atom of the second local environment.
+        etypes2 (np.ndarray): Species of atoms in the second local
+            environment.
+        sig (float): 2-body signal variance hyperparameter.
+        ls (float): 2-body length scale hyperparameter.
+        r_cut (float): 2-body cutoff radius.
+        cutoff_func (Callable): Cutoff function.
+
+    Returns:
+        (float, float):
+            Value of the 2-body kernel and its gradient with respect to the
+            hyperparameters.
+    """
+
+    kern = np.zeros(3)
+    kern_grad = np.zeros((2, 3))
+
+    ls1 = 1 / (2 * ls * ls)
+    ls2 = 1 / (ls * ls)
+    ls4 = 1 / (ls * ls * ls)
+
+    sig2 = sig * sig
+    sig3 = 2 * sig
+
+    for m in range(bond_array_1.shape[0]):
+        ri = bond_array_1[m, 0]
+        e1 = etypes1[m]
+
+        for n in range(bond_array_2.shape[0]):
+            e2 = etypes2[n]
+
+            # check if bonds agree
+            if (c1 == c2 and e1 == e2) or (c1 == e2 and c2 == e1):
+                rj = bond_array_2[n, 0]
+                r11 = ri - rj
+                D = r11 * r11
+
+                for d1 in range(3):
+                    ci = bond_array_1[m, d1 + 1]
+                    B = r11 * ci
+                    fi, fdi = cutoff_func(r_cut, ri, ci)
+                    fj, _ = cutoff_func(r_cut, rj, 0)
+
+                    kern_term, sig_term, ls_term = \
+                        grad_FE_helper(B, D, fi, fj, fdi, ls1,
+                                       ls2, ls4, sig2, sig3)
+
+                    kern[d1] += kern_term
+                    kern_grad[0, d1] += sig_term
+                    kern_grad[1, d1] += ls_term
+
+    return kern / 2, kern_grad / 2
 
 
 @njit

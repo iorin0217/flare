@@ -72,6 +72,34 @@ def grad_helper(A, B, C, D, fi, fj, fdi, fdj, ls1, ls2, ls3, ls4, ls5, ls6,
 
 
 @njit
+def grad_EE_helper(D, fi, fj, ls1, ls4, sig2, sig3):
+    E = exp(-D * ls1)
+    Y = sig2 * E * fi * fj
+    P = D * ls4
+    Z = P * Y
+    AA = sig3 * Y
+
+    return Y, Z, AA
+
+
+@njit
+def grad_FE_helper(B, D, fi, fj, fdi, ls1, ls2, ls4, sig2, sig3):
+    E = exp(-D * ls1)
+    F = B * ls2
+    G = -F * fi * fj
+    H = -fdi * fj
+    I = sig2 * (G + H) * E
+    AE = sig3 * (G + H) * E
+    P = D * ls4
+    Q = B * (ls2 * P - 2 * ls4)
+    AB = -Q * fi * fj
+    AC = -P * fdi * fj
+    AD = sig2 * (AB + AC) * E
+
+    return I, AD, AE
+
+
+@njit
 def force_energy_helper(B, D, fi, fj, fdi, ls1, ls2, sig2):
     E = exp(-D * ls1)
     F = B * ls2
@@ -549,8 +577,6 @@ def three_body_grad_perm(r11, r12, r13, r21, r22, r23, r31, r32, r33, c1, c2,
 # -----------------------------------------------------------------------------
 
 @njit
-
-
 def k_sq_exp_double_dev(q1, q2, sig, ls):
     """Second Gradient of generic squared exponential kernel on two many body functions
 
@@ -573,9 +599,8 @@ def k_sq_exp_double_dev(q1, q2, sig, ls):
 
     return ret
 
+
 @njit
-
-
 def k_sq_exp_dev(q1, q2, sig, ls):
     """First Gradient of generic squared exponential kernel on two many body functions
 
@@ -641,6 +666,7 @@ def q_value(distances, r_cut, cutoff_func, q_func=coordination_number):
         q += q_
 
     return q
+
 
 @njit
 def q_value_mc(distances, r_cut, ref_species, species, cutoff_func, q_func=coordination_number):
@@ -709,6 +735,7 @@ def mb_grad_helper_ls_(qdiffsq, sig, ls):
     ret = - prefact * (qdiffsq ** 2 / ls2 - 5 * qdiffsq + 2 * ls2)
 
     return ret
+
 
 @njit
 def mb_grad_helper_ls(q1, q2, qi, qj, sig, ls):
