@@ -22,11 +22,11 @@ output_file_name = input_dir + label + ".pwo"
 pw_loc = os.environ.get("PWSCF_COMMAND")
 os.environ["ASE_ESPRESSO_COMMAND"] = f"mpirun -np {no_cpus} {pw_loc} -npool {npool} < {input_file_name} > {output_file_name}"
 # setup calculator
-input_data = {"contol": {"pseudo_dir": f"{pseudo_dir}", "calculation": "scf"},
+input_data = {"control": {"pseudo_dir": f"{pseudo_dir}", "calculation": "scf"},
               "system": {"ibrav": 0, "ecutwfc": 75, "ecutrho": 600}, "electrons": {"conv_thr": 1.0e-12, "mixing_beta": 0.2}}
 pseudo_files = {"Ba": "Ba.pbe-spn-kjpaw_psl.1.0.0.UPF",
                 "Rh": "Rh.pbe-spn-kjpaw_psl.1.0.0.UPF", "O": "O.pbe-n-kjpaw_psl.0.1.UPF"}
-dft_calc = Espresso(pseudopotentials=pseudo_files, label=label,
+dft_calc = Espresso(pseudopotentials=pseudo_files, label=input_dir + label,
                     tstress=True, tprnfor=True, nosym=True, input_data=input_data, kpts=(8, 8, 8))
 structure_ase.set_calculator(dft_calc)
 # ASE to FLARE structure
