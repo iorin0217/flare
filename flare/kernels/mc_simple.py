@@ -406,7 +406,7 @@ def two_plus_three_force_grad(env1: AtomicEnvironment, env2: AtomicEnvironment,
                                                   env1.triplet_counts,
                                                   env2.triplet_counts,
                                                   sig3, ls3, r_cut_3, cutoff_func)
-    return two_f + three_f, np.concatnate([two_fg, three_fg])
+    return two_f + three_f, np.concatenate([two_fg, three_fg])
 
 
 def two_plus_three_energy_grad(env1: AtomicEnvironment, env2: AtomicEnvironment,
@@ -438,7 +438,7 @@ def two_plus_three_energy_grad(env1: AtomicEnvironment, env2: AtomicEnvironment,
                                                     env2.triplet_counts,
                                                     sig3, ls3, r_cut_3, cutoff_func)
 
-    return two_e + three_e, np.concatnate([two_eg, three_eg])
+    return two_e + three_e, np.concatenate([two_eg, three_eg])
 
 
 def two_plus_three_force_energy_grad(env1: AtomicEnvironment, env2: AtomicEnvironment,
@@ -470,7 +470,7 @@ def two_plus_three_force_energy_grad(env1: AtomicEnvironment, env2: AtomicEnviro
                                                    env2.triplet_counts,
                                                    sig3, ls3, r_cut_3, cutoff_func)
 
-    return two_fe + three_fe, np.concatnate([two_feg, three_feg])
+    return two_fe + three_fe, np.concatenate([two_feg, three_feg])
 
 
 # -----------------------------------------------------------------------------
