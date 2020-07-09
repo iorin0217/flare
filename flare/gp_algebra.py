@@ -1513,21 +1513,23 @@ def get_force_and_grad_block_pack(hyps: np.ndarray, name: str, s1: int, e1: int,
     args = from_mask_to_args(hyps, cutoffs, hyps_mask)
     # args = from_mask_to_args(hyps, cutoffs, hyps_mask)
 
-    for m_index in range(size1):
-        x_1 = training_data[int(math.floor(m_index / 3)) + s1]
+    for m_index in range(0, size1, 3):
+        x_1 = training_data[m_index + s1]
         if (same):
             lowbound = m_index
         else:
             lowbound = 0
-        for n_index in range(lowbound, size2):
-            x_2 = training_data[int(math.floor(n_index / 3)) + s2]
+        for n_index in range(lowbound, size2, 3):
+            x_2 = training_data[n_index + s2]
             kern_curr, grad_curr = grad_kernel(x_1, x_2, *args)
             # store kernel value
-            force_block[m_index, n_index] = kern_curr
-            grad_block[:, m_index, n_index] = grad_curr
+            force_block[m_index:m_index + 3, n_index:n_index + 3] = kern_curr
+            grad_block[:, m_index:m_index + 3, n_index:n_index + 3] = grad_curr
             if (same):
-                force_block[n_index, m_index] = kern_curr
-                grad_block[:, n_index, m_index] = grad_curr
+                force_block[n_index:n_index + 3,
+                            m_index:m_index + 3] = kern_curr.T
+                grad_block[:, n_index:n_index + 3,
+                           m_index:m_index + 3] = grad_curr.transpose(0, 2, 1)
 
     return force_block, grad_block
 
@@ -1697,24 +1699,20 @@ def get_force_energy_and_grad_block_pack(hyps: np.ndarray, name: str, s1: int,
     args = from_mask_to_args(hyps, cutoffs, hyps_mask)
     # args = from_mask_to_args(hyps, cutoffs, hyps_mask)
 
-    for m_index in range(size1):
-        environment_1 = training_data[int(math.floor(m_index / 3)) + s1]
+    for m_index in range(0, size1, 3):
+        environment_1 = training_data[m_index + s1]
         # d_1 = ds[m_index % 3]
 
         for n_index in range(size2):
             structure = training_structures[n_index + s2]
 
             # Loop over environments in the training structure.
-            kern_curr = 0
-            grad_curr = 0
             for environment_2 in structure:
-                kern_tmp, grad_tmp = grad_kernel(environment_1, environment_2, *args)
-                kern_curr += kern_tmp
-                grad_curr += grad_tmp
-
-            # store kernel value
-            force_energy_block[m_index, n_index] = kern_curr
-            grad_block[m_index, n_index] = grad_curr
+                kern_curr, grad_curr = grad_kernel(
+                    environment_1, environment_2, *args)
+                # store kernel value
+                force_energy_block[m_index:m_index + 3, n_index] += kern_curr
+                grad_block[:, m_index:m_index + 3, n_index] += grad_curr
 
     return force_energy_block, grad_block
 
