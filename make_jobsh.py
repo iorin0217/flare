@@ -3,30 +3,35 @@ RSG & CUR step : job_RSGCUR.sh
     RSG via pyxtal and CUR selection by SOAP kernel via Dscribe
     input : RSGCUR.json
         RSGCUR.json : {CUR hyps, SOAP hyps}
-    output : [{composition}_0.pickle], dft_targets.txt
-        dft_targets.txt : path to {composition}_0.pickle s
+    output : [{composition}_0.pickle], dft_targets_0.txt
+        dft_targets_{num}.txt : path to {composition}_0.pickle s \n
+                            add atom targets number
 
 DFT step : job_DFT.sh
     DFT via ASE array job
-    input : [{composition}_{num}.pickle], dft_targets.txt
-    output : [data.pickle : FLARE structure]
+    input : dft_targets_{num}.txt
+    output : [{composition}_0_flare.pickle : FLARE structure], log.txt
+        log.txt : write "DFT {num}"
 
 MLE step : job_MLE.sh
-    update gp db and MLE via FLARE
-    input : gp{num}.pickle, datas.pickle, log.txt
+    update gp update db and MLE via FLARE
+    input : gp_{num}.pickle, log.txt
         gp{num}.pickle : FLARE gp model
-        log.txt : 
-    output : gp{num}.pickle, log.txt
+        log.txt : read "DFT {num}" or "pass {num}"
+    output : gp{num+1}.pickle, log.txt
+        write "update {num}"
 
 MD & GPR step : job_MDGPR.sh
     sample new structure by MD via ASE and GPR via FLARE array job
-    input : datas.pickle, gp{num}.pickle
-    output : datas.pickle
+    input : md_targets_{num}.txt, gp_{num}.pickle
+        md_targets_{num}.txt : path to {composition}_0_flare.pickle s
+    output : md_targets_{num+1}.txt
 
 OTF step : job_OTF.sh
     decide wheter to perform DFT
-    input : datas.pickle
-    output : structure_add.pickle, log.txt
+    input : md_targets_{num}.txt
+    output : dft_targets_{num}.txt, log.txt
+
 
 MHM step : job_MHM.sh
     RSG via pyxtal and MHM via ASE array by MGP via LAMMPS
