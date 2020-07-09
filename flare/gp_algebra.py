@@ -1406,14 +1406,11 @@ def get_Ky_mat_and_grad(hyps: np.ndarray, name: str, force_grad_kernel: Callable
     size1 = len(training_data) * 3
     size2 = len(training_structures)
 
-    _, non_noise_hyps, train_noise = obtain_noise_len(hyps, hyps_mask)
+    sigma_n, non_noise_hyps, train_noise = obtain_noise_len(hyps, hyps_mask)
 
     # Initialize Ky.
     ky_mat = np.zeros((size1 + size2, size1 + size2))
-    if (train_noise):
-        grad_mat = np.zeros((non_noise_hyps + 1, size1 + size2, size1 + size2))
-    else:
-        grad_mat = np.zeros((non_noise_hyps, size1 + size2, size1 + size2))
+    grad_mat = np.zeros((non_noise_hyps, size1 + size2, size1 + size2))
 
     # Assemble the full covariance matrix block-by-block.
     force_block, force_grad_block = get_force_and_grad_block(hyps, name, force_grad_kernel, non_noise_hyps, cutoffs, hyps_mask,
@@ -1436,7 +1433,15 @@ def get_Ky_mat_and_grad(hyps: np.ndarray, name: str, force_grad_kernel: Callable
     grad_mat[:, 0:size1, size1:] = force_energy_grad_block
     grad_mat[:, size1:, 0:size1] = force_energy_grad_block.transpose()
 
-    return grad_mat, ky_mat
+    if (train_noise):
+        grad_mat_final = np.zeros([grad_mat.shape[0]+1, grad_mat.shape[1],
+                                   grad_mat.shape[2]])
+        grad_mat_final[:-1, :, :] = grad_mat
+        grad_mat_final[-1, :, :] = np.eye(size1 + size2) * 2 * sigma_n
+    else:
+        grad_mat_final = grad_mat
+
+    return grad_mat_final, ky_mat
 
 
 def get_force_and_grad_block(hyps: np.ndarray, name: str, grad_kernel, non_noise_hyps, cutoffs=None,
@@ -1476,7 +1481,7 @@ def get_force_and_grad_block(hyps: np.ndarray, name: str, grad_kernel, non_noise
     sigma_n, _, __ = obtain_noise_len(hyps, hyps_mask)
     force_block = k_mat
     force_block += sigma_n ** 2 * np.eye(size3)
-
+    '''
     if (train_noise):
         force_grad = np.zeros(
             [grad_mat.shape[0] + 1, grad_mat.shape[1], grad_mat.shape[2]])
@@ -1484,7 +1489,7 @@ def get_force_and_grad_block(hyps: np.ndarray, name: str, grad_kernel, non_noise
         force_grad[-1, :, :] = np.eye(size3) * 2 * sigma_n
     else:
         force_grad = grad_mat
-
+    '''
     return force_block, force_grad
 
 
@@ -1598,7 +1603,7 @@ def get_energy_and_grad_block(hyps: np.ndarray, name: str, grad_kernel, energy_n
 
     energy_block = k_mat
     energy_block += (energy_noise ** 2) * np.eye(size)
-
+    '''
     if (train_noise):
         energy_grad = np.zeros(
             [grad_mat.shape[0] + 1, grad_mat.shape[1], grad_mat.shape[2]])
@@ -1606,7 +1611,7 @@ def get_energy_and_grad_block(hyps: np.ndarray, name: str, grad_kernel, energy_n
         energy_grad[-1, :, :] = np.eye(size) * 2 * energy_noise
     else:
         energy_grad = grad_mat
-
+    '''
     return energy_block, energy_grad
 
 
