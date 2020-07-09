@@ -396,11 +396,16 @@ def two_plus_three_force_grad(env1: AtomicEnvironment, env2: AtomicEnvironment,
                                                 sig2, ls2, r_cut_2, cutoff_func)
 
     three_f, three_fg = \
-        three_body_mc_simple.force_force_gradient(env1.bond_array_2, env1.ctype,
-                                                  env1.etypes, env2.bond_array_2,
+        three_body_mc_simple.force_force_gradient(env1.bond_array_3, env1.ctype,
+                                                  env1.etypes, env2.bond_array_3,
                                                   env2.ctype, env2.etypes,
+                                                  env1.cross_bond_inds,
+                                                  env2.cross_bond_inds,
+                                                  env1.cross_bond_dists,
+                                                  env2.cross_bond_dists,
+                                                  env1.triplet_counts,
+                                                  env2.triplet_counts,
                                                   sig3, ls3, r_cut_3, cutoff_func)
-
     return two_f + three_f, two_fg + three_fg
 
 
@@ -422,9 +427,15 @@ def two_plus_three_energy_grad(env1: AtomicEnvironment, env2: AtomicEnvironment,
                                                   sig2, ls2, r_cut_2, cutoff_func)
 
     three_e, three_eg = \
-        three_body_mc_simple.energy_energy_gradient(env1.bond_array_2, env1.ctype,
-                                                    env1.etypes, env2.bond_array_2,
+        three_body_mc_simple.energy_energy_gradient(env1.bond_array_3, env1.ctype,
+                                                    env1.etypes, env2.bond_array_3,
                                                     env2.ctype, env2.etypes,
+                                                    env1.cross_bond_inds,
+                                                    env2.cross_bond_inds,
+                                                    env1.cross_bond_dists,
+                                                    env2.cross_bond_dists,
+                                                    env1.triplet_counts,
+                                                    env2.triplet_counts,
                                                     sig3, ls3, r_cut_3, cutoff_func)
 
     return two_e + three_e, two_eg + three_eg
@@ -448,9 +459,15 @@ def two_plus_three_force_energy_grad(env1: AtomicEnvironment, env2: AtomicEnviro
                                                  sig2, ls2, r_cut_2, cutoff_func)
 
     three_fe, three_feg = \
-        three_body_mc_simple.force_energy_gradient(env1.bond_array_2, env1.ctype,
-                                                   env1.etypes, env2.bond_array_2,
+        three_body_mc_simple.force_energy_gradient(env1.bond_array_3, env1.ctype,
+                                                   env1.etypes, env2.bond_array_3,
                                                    env2.ctype, env2.etypes,
+                                                   env1.cross_bond_inds,
+                                                   env2.cross_bond_inds,
+                                                   env1.cross_bond_dists,
+                                                   env2.cross_bond_dists,
+                                                   env1.triplet_counts,
+                                                   env2.triplet_counts,
                                                    sig3, ls3, r_cut_3, cutoff_func)
 
     return two_fe + three_fe, two_feg + three_feg
