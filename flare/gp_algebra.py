@@ -1510,6 +1510,7 @@ def get_force_and_grad_block_pack(hyps: np.ndarray, name: str, s1: int, e1: int,
     # ds = [1, 2, 3]
 
     # calculate elements
+    args = from_mask_to_args(hyps, cutoffs, hyps_mask)
     # args = from_mask_to_args(hyps, cutoffs, hyps_mask)
 
     for m_index in range(size1):
@@ -1520,7 +1521,7 @@ def get_force_and_grad_block_pack(hyps: np.ndarray, name: str, s1: int, e1: int,
             lowbound = 0
         for n_index in range(lowbound, size2):
             x_2 = training_data[int(math.floor(n_index / 3)) + s2]
-            kern_curr, grad_curr = grad_kernel(x_1, x_2)
+            kern_curr, grad_curr = grad_kernel(x_1, x_2, *args)
             # store kernel value
             force_block[m_index, n_index] = kern_curr
             grad_block[:, m_index, n_index] = grad_curr
@@ -1616,6 +1617,7 @@ def get_energy_and_grad_block_pack(hyps: np.ndarray, name: str, s1: int, e1: int
     grad_block = np.zeros([non_noise_hyps, size1, size2])
 
     # calculate elements
+    args = from_mask_to_args(hyps, cutoffs, hyps_mask)
     # args = from_mask_to_args(hyps, cutoffs, hyps_mask)
 
     for m_index in range(size1):
@@ -1635,7 +1637,7 @@ def get_energy_and_grad_block_pack(hyps: np.ndarray, name: str, s1: int, e1: int
             for environment_1 in struc_1:
                 for environment_2 in struc_2:
                     kern_tmp, grad_tmp = grad_kernel(
-                        environment_1, environment_2)
+                        environment_1, environment_2, *args)
                     kern_curr += kern_tmp
                     grad_curr += grad_tmp
 
@@ -1692,6 +1694,7 @@ def get_force_energy_and_grad_block_pack(hyps: np.ndarray, name: str, s1: int,
     # ds = [1, 2, 3]
 
     # calculate elements
+    args = from_mask_to_args(hyps, cutoffs, hyps_mask)
     # args = from_mask_to_args(hyps, cutoffs, hyps_mask)
 
     for m_index in range(size1):
@@ -1705,7 +1708,7 @@ def get_force_energy_and_grad_block_pack(hyps: np.ndarray, name: str, s1: int,
             kern_curr = 0
             grad_curr = 0
             for environment_2 in structure:
-                kern_tmp, grad_tmp = grad_kernel(environment_1, environment_2)
+                kern_tmp, grad_tmp = grad_kernel(environment_1, environment_2, *args)
                 kern_curr += kern_tmp
                 grad_curr += grad_tmp
 

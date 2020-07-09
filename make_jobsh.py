@@ -8,9 +8,8 @@ RSG & CUR step : job_RSGCUR.sh
 
 DFT step : job_DFT.sh
     DFT via ASE array job
-    input : structures_{init/add}.pickle
-    output : datas.pickle
-        datas.pickle : [data.pickle : FLARE structure]
+    input : [{composition}_{num}.pickle], dft_targets.txt
+    output : [data.pickle : FLARE structure]
 
 MLE step : job_MLE.sh
     update gp db and MLE via FLARE

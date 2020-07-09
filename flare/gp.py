@@ -432,7 +432,7 @@ class GaussianProcess:
 
         x_0 = self.hyps
 
-        args = (self.name, self.force_grad, self.energy_grad, self.force_energy_grad, logger,
+        args = (self.name, self.force_grad, self.energy_grad, self.force_energy_grad, self.energy_noise, logger,
                 self.cutoffs, self.hyps_mask,
                 self.n_cpus, self.n_sample)
 
