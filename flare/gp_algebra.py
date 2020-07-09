@@ -1431,7 +1431,7 @@ def get_Ky_mat_and_grad(hyps: np.ndarray, name: str, force_grad_kernel: Callable
     grad_mat[:, 0:size1, 0:size1] = force_grad_block
     grad_mat[:, size1:, size1:] = energy_grad_block
     grad_mat[:, 0:size1, size1:] = force_energy_grad_block
-    grad_mat[:, size1:, 0:size1] = force_energy_grad_block.transpose()
+    grad_mat[:, size1:, 0:size1] = force_energy_grad_block.transpose(0, 2, 1)
 
     if (train_noise):
         grad_mat_final = np.zeros([grad_mat.shape[0]+1, grad_mat.shape[1],
