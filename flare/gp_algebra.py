@@ -1490,7 +1490,7 @@ def get_force_and_grad_block(hyps: np.ndarray, name: str, grad_kernel, non_noise
     else:
         force_grad = grad_mat
     '''
-    return force_block, force_grad
+    return force_block, grad_mat
 
 
 def get_force_and_grad_block_pack(hyps: np.ndarray, name: str, s1: int, e1: int,
@@ -1612,7 +1612,7 @@ def get_energy_and_grad_block(hyps: np.ndarray, name: str, grad_kernel, energy_n
     else:
         energy_grad = grad_mat
     '''
-    return energy_block, energy_grad
+    return energy_block, grad_mat
 
 
 def get_energy_and_grad_block_pack(hyps: np.ndarray, name: str, s1: int, e1: int,
