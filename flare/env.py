@@ -10,7 +10,6 @@ from flare.utils.env_getarray import get_2_body_arrays, get_3_body_arrays, \
     get_m2_body_arrays
 
 
-
 class AtomicEnvironment:
     """Contains information about the local environment of an atom,
     including arrays of pair and triplet distances and the chemical
@@ -81,7 +80,7 @@ class AtomicEnvironment:
 
         self.structure = structure
         self.positions = structure.wrapped_positions
-        self.cell = structure.cell
+        self.cell = np.array(structure.cell)
         self.species = structure.coded_species
 
         # backward compatability
@@ -187,7 +186,6 @@ class AtomicEnvironment:
                         self.threebody_cutoff_list = \
                             np.array(cutoffs_mask['threebody_cutoff_list'],
                                      dtype=np.float)
-
 
     def compute_env(self):
 

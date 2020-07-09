@@ -90,24 +90,24 @@ class OTF:
     """
 
     def __init__(
-     self,
-     # md args
-     dt: float, number_of_steps: int, prev_pos_init: 'ndarray' = None,
-     rescale_steps: List[int] = [], rescale_temps: List[int] = [],
-     # flare args
-     gp: gp.GaussianProcess = None, calculate_energy: bool = False,
-     calculate_efs: bool = False, write_model: int = 0,
-     # otf args
-     std_tolerance_factor: float = 1, skip: int = 0,
-     init_atoms: List[int] = None, output_name: str = 'otf_run',
-     max_atoms_added: int = 1, freeze_hyps: int = 10,
-     # dft args
-     force_source: str = "qe", npool: int = None, mpi: str = "srun",
-     dft_loc: str = None, dft_input: str = None, dft_output='dft.out',
-     dft_kwargs=None,
-     store_dft_output: Tuple[Union[str, List[str]], str] = None,
-     # par args
-     n_cpus: int = 1):
+        self,
+        # md args
+        dt: float, number_of_steps: int, prev_pos_init: 'ndarray' = None,
+        rescale_steps: List[int] = [], rescale_temps: List[int] = [],
+        # flare args
+        gp: gp.GaussianProcess = None, calculate_energy: bool = False,
+        calculate_efs: bool = False, write_model: int = 0,
+        # otf args
+        std_tolerance_factor: float = 1, skip: int = 0,
+        init_atoms: List[int] = None, output_name: str = 'otf_run',
+        max_atoms_added: int = 1, freeze_hyps: int = 10,
+        # dft args
+        force_source: str = "qe", npool: int = None, mpi: str = "srun",
+        dft_loc: str = None, dft_input: str = None, dft_output='dft.out',
+        dft_kwargs=None,
+        store_dft_output: Tuple[Union[str, List[str]], str] = None,
+        # par args
+            n_cpus: int = 1):
 
         self.dft_input = dft_input
         self.dft_output = dft_output
