@@ -1514,13 +1514,13 @@ def get_force_and_grad_block_pack(hyps: np.ndarray, name: str, s1: int, e1: int,
     # args = from_mask_to_args(hyps, cutoffs, hyps_mask)
 
     for m_index in range(0, size1, 3):
-        x_1 = training_data[m_index + s1]
+        x_1 = training_data[int(math.floor(m_index / 3)) + s1]
         if (same):
             lowbound = m_index
         else:
             lowbound = 0
         for n_index in range(lowbound, size2, 3):
-            x_2 = training_data[n_index + s2]
+            x_2 = training_data[int(math.floor(n_index / 3)) + s2]
             kern_curr, grad_curr = grad_kernel(x_1, x_2, *args)
             # store kernel value
             force_block[m_index:m_index + 3, n_index:n_index + 3] = kern_curr
@@ -1700,7 +1700,7 @@ def get_force_energy_and_grad_block_pack(hyps: np.ndarray, name: str, s1: int,
     # args = from_mask_to_args(hyps, cutoffs, hyps_mask)
 
     for m_index in range(0, size1, 3):
-        environment_1 = training_data[m_index + s1]
+        environment_1 = training_data[int(math.floor(m_index / 3)) + s1]
         # d_1 = ds[m_index % 3]
 
         for n_index in range(size2):
