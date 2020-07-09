@@ -1410,7 +1410,10 @@ def get_Ky_mat_and_grad(hyps: np.ndarray, name: str, force_grad_kernel: Callable
 
     # Initialize Ky.
     ky_mat = np.zeros((size1 + size2, size1 + size2))
-    grad_mat = np.zeros((non_noise_hyps, size1 + size2, size1 + size2))
+    if (train_noise):
+        grad_mat = np.zeros((non_noise_hyps + 1, size1 + size2, size1 + size2))
+    else:
+        grad_mat = np.zeros((non_noise_hyps, size1 + size2, size1 + size2))
 
     # Assemble the full covariance matrix block-by-block.
     force_block, force_grad_block = get_force_and_grad_block(hyps, name, force_grad_kernel, non_noise_hyps, cutoffs, hyps_mask,
