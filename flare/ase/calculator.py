@@ -94,7 +94,7 @@ class FLARE_Calculator(Calculator):
         ]
         res_dims = [1, 3, 6, 1, 3, 6]
         for i in range(len(res_name)):
-            assert (res[i].shape[1] == res_dims[i], "shape doesn't match")
+            # assert (res[i].shape[1] == res_dims[i], "shape doesn't match")
             self.results[res_name[i]] = res[i]
 
     def calculate_mgp(self, atoms):
