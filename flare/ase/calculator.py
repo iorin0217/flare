@@ -121,22 +121,30 @@ class FLARE_Calculator(Calculator):
 
     def calculate_gp(self, atoms):
         if self.par:
-            _ = predict_on_structure_efs_par(
-                atoms, self.gp_model, write_to_structure=True)
+            res = predict_on_structure_efs_par(
+                atoms, self.gp_model, write_to_structure=False)
         else:
-            _ = predict_on_structure_efs(
-                atoms, self.gp_model, write_to_structure=True)
-        self.results["energy"] = atoms.potential_energy
-        self.results["forces"] = atoms.forces
-        self.results["stress"] = atoms.stress  # ASE format
-        self.results["energy_stds"] = np.sqrt(
-            np.sum(atoms.local_energy_stds**2))  # calculate here
-        self.results["stds"] = atoms.force_stds
-        self.results["stress_stds"] = atoms.stress_stds
-        self.results["local_energies"] = atoms.local_energies
-        self.results["partial_stresses"] = atoms.partial_stresses
-        self.results["local_energy_stds"] = atoms.local_energy_stds
-        self.results["partial_stress_stds"] = atoms.partial_stress_stds
+            res = predict_on_structure_efs(
+                atoms, self.gp_model, write_to_structure=False)
+        current_volume = np.linalg.det(np.array(atoms.cell))
+        flare_stress = np.sum(res[2], 0) / current_volume
+        flare_stress_stds = \
+            (np.sqrt(np.sum(res[5]**2, 0)) / current_volume)
+        self.results["energy"] = np.sum(res[0])
+        self.results["forces"] = res[1]
+        self.results["stress"] = -np.array([flare_stress[0], flare_stress[3], flare_stress[5],
+                                            flare_stress[4], flare_stress[2], flare_stress[1]])  # ASE format
+        self.results["energy_stds"] = np.sqrt(np.sum(res[3]**2))
+        self.results["stds"] = res[4]
+        self.results["stress_stds"] = np.array([flare_stress_stds[0], flare_stress_stds[3], flare_stress_stds[5],
+                                                flare_stress_stds[4], flare_stress_stds[2], flare_stress_stds[1]])
+        self.results["local_energies"] = res[0]
+        self.results["partial_stresses"] = res[2]
+        self.results["local_energy_stds"] = res[3]
+        self.results["partial_stress_stds"] = res[5]
+
+    def show_results(self, atoms):
+        return self.results
 
     def calculate_mgp(self, atoms):
         nat = len(atoms)
