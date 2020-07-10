@@ -143,7 +143,7 @@ class FLARE_Calculator(Calculator):
         self.results["local_energy_stds"] = res[3]
         self.results["partial_stress_stds"] = res[5]
 
-    def show_results(self, atoms):
+    def show_results(self):
         return self.results
 
     def calculate_mgp(self, atoms):
