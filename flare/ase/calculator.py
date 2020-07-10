@@ -59,6 +59,27 @@ class FLARE_Calculator(Calculator):
     def get_stress(self, atoms):
         return self.get_property("stress", atoms)
 
+    def get_energy_stds(self, atoms):
+        return self.get_property("energy_stds", atoms)
+
+    def get_stds(self, atoms):
+        return self.get_property("stds", atoms)
+
+    def get_stress_stds(self, atoms):
+        return self.get_property("stress_stds", atoms)
+
+    def get_local_energies(self, atoms):
+        return self.get_property("local_energies", atoms)
+
+    def get_partial_stresses(self, atoms):
+        return self.get_property("partial_stresses", atoms)
+
+    def get_local_energy_stds(self, atoms):
+        return self.get_property("local_energy_stds", atoms)
+
+    def get_partial_stress_stds(self, atoms):
+        return self.get_property("partial_stress_stds", atoms)
+
     def calculate(self, atoms):
         """
         Calculate properties including: energy, local energies, forces,
@@ -71,7 +92,7 @@ class FLARE_Calculator(Calculator):
             self.calculate_mgp(atoms)
         else:
             self.calculate_gp(atoms)
-
+    '''
     def calculate_gp(self, atoms):
         # Compute energy, forces, and stresses and their uncertainties
         if self.par:
@@ -96,6 +117,26 @@ class FLARE_Calculator(Calculator):
         for i in range(len(res_name)):
             # assert (res[i].shape[1] == res_dims[i], "shape doesn't match")
             self.results[res_name[i]] = res[i]
+    '''
+
+    def calculate_gp(self, atoms):
+        if self.par:
+            _ = predict_on_structure_efs_par(
+                atoms, self.gp_model, write_to_structure=True)
+        else:
+            _ = predict_on_structure_efs(
+                atoms, self.gp_model, write_to_structure=True)
+        self.results["energy"] = atoms.potential_energy
+        self.results["forces"] = atoms.forces
+        self.results["stress"] = atoms.stress  # ASE format
+        self.results["energy_stds"] = np.sqrt(
+            np.sum(atoms.local_energy_stds**2))  # calculate here
+        self.results["stds"] = atoms.force_stds
+        self.results["stress_stds"] = atoms.stress_stds
+        self.results["local_energies"] = atoms.local_energies
+        self.results["partial_stresses"] = atoms.partial_stresses
+        self.results["local_energy_stds"] = atoms.local_energy_stds
+        self.results["partial_stress_stds"] = atoms.partial_stress_stds
 
     def calculate_mgp(self, atoms):
         nat = len(atoms)
