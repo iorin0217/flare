@@ -1,19 +1,21 @@
 '''
 python MDGPR.py path/to/flare_atoms_{num}.pickle path/to/flare_atoms_{method}_{num}.pickle gp_{num}.pickle
 '''
+import os
+import sys
 import pandas as pd
 from flare.ase.calculator import FLARE_Calculator
-from flare.ase.atoms import FLARE_Atoms
-from flare.struc import Structure
-from ase import Atoms
+from flare.gp import GaussianProcess
 from ase import units
 from ase.md.npt import NPT
 
 # input
 structure_path = sys.argv[1]
 structure = pd.read_pickle(structure_path)
-prefix = structure_path.split("_")[0]
-step = int(structure_path.split("/")[-1].split(".")[0].split("_")[-1])
+outdir = os.path.dirname(structure_path)
+step_num = int(os.path.basename(structure_path).split(".")[0].split("_")[-1])
+comp = os.path.basename(structure_path).split("_")[0]
+compdir = os.path.dirname(outdir)
 # trust structure.cell is upper triangular matrix
 efs_path = sys.argv[2]
 efs = pd.read_pickle(efs_path)
@@ -26,14 +28,14 @@ flare_calculator_MD = FLARE_Calculator(gp_model,
                                        use_mapping=False)
 flare_calculator_MD.results = efs
 # setup MD
-# 5fs*2 -> 10ps (1000step)
+# 5fs*2 -> 10ps (1000step_num)
 # 300~1500K=0.02585~0.12926eV 0~10GPa=0~0.06ev/A^3
 # sequence (300,0) -> (300,10) -> (1500,10) -> (1500,0)
-if step < 250:
+if step_num < 250:
     temperature, pressure = 0.02585, 0.0
-elif step < 500:
+elif step_num < 500:
     temperature, pressure = 0.02585, 0.06
-elif step < 750:
+elif step_num < 750:
     temperature, pressure = 0.12926, 0.06
 else:
     temperature, pressure = 0.12926, 0.0
@@ -43,7 +45,10 @@ md = NPT(atoms=structure, timestep=5 * units.fs, temperature=temperature,
 # run MD
 md.run(2)
 # record_state
-
+md_log = [f"gibbs_free_energy : {md.get_gibbs_free_energy()}", f"total_energy : {structure.get_total_energy()}",
+          f"kinetic_energy : {structure.get_kinetic_energy()}", f"temperature : {structure.get_temperature}", structure.get_velocities()]
+print(*md_log, sep="\n", end="\n",
+      file=open(f"{outdir}/md_log_{step_num}.txt", "w"))
 del flare_calculator_MD  # for memory save
 # run GPR for new structure
 flare_calculator_GPR = FLARE_Calculator(gp_model,
@@ -53,6 +58,8 @@ flare_calculator_GPR = FLARE_Calculator(gp_model,
 structure.set_calculator(flare_calculator_GPR)
 structure.calc.calculate(structure)
 # save structure and efs
-pd.to_pickle(structure, f"{prefix}_{step + 1}.pickle")
+new_dir = compdir + "/" + comp + "_" + (step_num + 1)
+os.mkdir(new_dir)
+pd.to_pickle(structure, f"{new_dir}/{comp}_{step_num + 1}.pickle")
 results = structure.calc.show_results
-pd.to_pickle(results, f"{prefix}_gpr_{step + 1}.pickle")
+pd.to_pickle(results, f"{new_dir}/{comp}_gpr_{step_num + 1}.pickle")

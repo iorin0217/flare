@@ -3,6 +3,7 @@ python MLE.py gp_{num}.pickle, log.txt
 '''
 import os
 import sys
+import time
 import numpy as np
 import pandas as pd
 from flare.gp import GaussianProcess
@@ -40,3 +41,4 @@ if previous_num % 10 == 0:
 gp_model.write_model(f'gp_{previous_num+1}', format='pickle')
 print(*(logs + [f"update {previous_num}"]),
       sep="\n", end="\n", file=open(log_txt, "w"))
+# rename
