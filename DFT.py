@@ -36,3 +36,12 @@ structure_flare.forces = structure_ase.get_forces()
 structure_flare.stress = structure_ase.get_stress()
 # save
 pd.to_pickle(structure_flare, input_dir + label + "_flare.pickle")
+
+# convert to upper triangular cell
+_, Q = structure.cell.standard_form()
+deg_y = np.rad2deg(np.arccos(tmp.cell[1]@np.array(
+    [0, 1, 0])/np.linalg.norm(tmp.cell[1])))
+tmp.rotate(np.sign(tmp.cell[1][0]) * deg_y, "z", rotate_cell=True)
+deg_z = np.rad2deg(np.arccos(tmp.cell[2]@np.array(
+    [0, 0, 1])/np.linalg.norm(tmp.cell[2])))
+tmp.rotate(np.sign(tmp.cell[2][0]) * deg_z, "y", rotate_cell=True)

@@ -24,13 +24,14 @@ MLE step : job_MLE.sh
 MD & GPR step : job_MDGPR.sh
     sample new structure by MD via ASE and GPR via FLARE array job
     input : md_targets_{num}.txt, gp_{num}.pickle
-        md_targets_{num}.txt : path to {composition}_0_flare.pickle s
-    output : md_targets_{num+1}.txt
+        md_targets_{num}.txt : path to {composition}_{num}.pickle & path to {composition}_{method}_{num}.pickle s
+    output : 
 
 OTF step : job_OTF.sh
     decide wheter to perform DFT
     input : md_targets_{num}.txt
-    output : dft_targets_{num}.txt, log.txt
+    output : md_targets_{num+1}.txt, dft_targets_{num}.txt, log.txt
+        log.txt : write 
 
 
 MHM step : job_MHM.sh
