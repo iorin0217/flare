@@ -72,14 +72,14 @@ if __name__ == "__main__":
         MLE_sh = header_common + header_MLE + \
             [f"#PBS -N MLE_{i}"] + config + MLE
         print(*MLE_sh, sep="\n", end="\n", file=open(f"job_MLE_{i}.sh", "w"))
-        MDGPR = [f'target=`sed -n $(2*$PBS_ARRAY_INDEX-1)"P" md_targets_{i}.txt`', f'engine=`sed -n $(2*$PBS_ARRAY_INDEX)"P" md_targets_{i}.txt`',
+        MDGPR = [f'target=`sed -n $((2*PBS_ARRAY_INDEX-1))"P" md_targets_{i}.txt`', f'engine=`sed -n $((2*PBS_ARRAY_INDEX-1))"P" md_targets_{i}.txt`',
                  f"python3 /lustre/{token}/{user}/flare/MDGPR.py $target $engine $PBS_O_WORKDIR/gp_{i}.pickle"]
         MDGPR_sh = header_common + header_MDGPR + \
             [f"#PBS -N MDGPR_{i}"] + config + MDGPR
         print(*MDGPR_sh, sep="\n", end="\n",
               file=open(f"job_MDGPR_{i}.sh", "w"))
-        OTF = [f'target=`sed -n $PBS_ARRAY_INDEX"P" dft_targets_{i}.txt`',
-               f"python3 /lustre/{token}/{user}/flare/OTF.py $PBS_O_WORKDIR/md_targets_{i}.txt $PBS_O_WORKDIR/log.txt"]
+        OTF = [
+            f"python3 /lustre/{token}/{user}/flare/OTF.py $PBS_O_WORKDIR/md_targets_{i}.txt $PBS_O_WORKDIR/log.txt"]
         OTF_sh = header_common + header_OTF + \
             [f"#PBS -N OTF_{i}"] + config + OTF
         print(*OTF_sh, sep="\n", end="\n", file=open(f"job_OTF_{i}.sh", "w"))
