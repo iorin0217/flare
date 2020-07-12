@@ -10,3 +10,4 @@ IPython
 pytest>=4.6
 spglib
 pyxtal
+dscribe

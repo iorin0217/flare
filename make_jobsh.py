@@ -8,7 +8,7 @@ RSG & CUR step : job_RSGCUR.sh
 DFT step : job_DFT.sh
     DFT via ASE array job
     input : dft_targets_{num}.txt
-    output : [{composition}_dft_{num}.pickle], log.txt
+    output : [{composition}_dft_{num}.pickle]
 
 MLE step : job_MLE.sh
     update gp update db and MLE via FLARE
@@ -26,16 +26,24 @@ OTF step : job_OTF.sh
     input : md_targets_{num}.txt, log.txt
     output : md_targets_{num+1}.txt, dft_targets_{num+1}.txt, log.txt
 
-log.txt : OTF 0 start_time YMDHMS
-          DFT 0 start_time YMDHMS
-          MLE 0 start_time YMDHMS start_hyps 1 2 3 4 5 end_hyps 1 2 3 4 5
-          MDGPR 0 start_time YMDHMS
-          OTF 1 start_time YMDHMS True
+log.txt : OTF 0 end_time YMD HMS True
+          DFT 0 end_time YMD HMS
+          MLE 0 end_time YMD HMS start_hyps [1, 2, 3, 4, 5] end_hyps [1, 2, 4, 6, 8]
+          MDGPR 0 end_time YMD HMS
+          OTF 1 end_time YMD HMS False
           DFT 1 ...
 
-dft_targets_{num}.txt : path to {composition}_0.pickle s \n
-                            add atom targets number
-md_targets_{num}.txt : path to {composition}_{num}.pickle & path to {composition}_{method}_{num}.pickle s
+dft_targets_{num}.txt : expdir/{composition0}/{composition0}_{num}/{composition0}_{num}.pickle
+                        [0, 2, 4, 5]
+                        expdir/{composition1}/{composition1}_{num}/{composition1}_{num}.pickle
+                        [3, 8, 12]
+                        ...
+
+md_targets_{num}.txt : expdir/{composition0}/{composition0}_{num}/{composition0}_{num}.pickle
+                       expdir/{composition0}/{composition0}_{num}/{composition0}_{method}_{num}.pickle
+                       expdir/{composition1}/{composition1}_{num}/{composition1}_{num}.pickle
+                       expdir/{composition1}/{composition1}_{num}/{composition1}_{method}_{num}.pickle
+                       ...
 
 
 MHM step : job_MHM.sh

@@ -2,48 +2,13 @@
 python OTF.py md_targets_{num}.txt, log.txt
 '''
 import os
+import re
 import sys
-import time
+import datetime
 import pandas as pd
-
-# config
-std_tolerance = 2
-noise =
-max_atoms_added = 12
-# input
-md_targets_txt = sys.argv[1]
-step_num = int(os.path.basename(
-    md_targets_txt).split(".")[0].split("_")[-1]) + 1
-log_txt = sys.argv[2]
-expdir = os.path.dirname(md_targets_txt)
-# collelct
-with open(md_targets_txt, "r") as f:
-    tmp = f.readlines()
-    md_targets = [i.split("\n")[0] for i in tmp]
-# read step + 1 target
-structures = []
-resultss = []
-for previous_structure_path in md_targets:
-    compdir = os.path.dirname(os.path.dirname(previous_structure_path))
-    comp = os.path.basename(compdir)
-    outdir = comdpir + "/" + comp + "_" + step_num
-    structure = pd.read_pickle(
-        outdir + "/" + comp + "_" + step_num + ".pickle")
-    results = pd.read_pickle(outdir + "/" + comp + "_" +
-                             "gpr" + "_" + step_num + ".pickle")
-    structures.append(structure)
-    resultss.append(results)
-flag, target_atoms = is_std_in_bound_par(
-    std_tolerance, noise, structures, resultss, max_atoms_added)
-if flag:
-    # log
-    # MDGPRもかいてあげる
-    # dft_targets空
-else:
-    dft_targets.txt
-    results変える
-
-# target_atomsはtarge_structureとセット
+import numpy as np
+from dscribe.descriptors import SOAP
+from scipy.sparse.linalg import LinearOperator, svds
 
 
 def is_std_in_bound_par(std_tolerance, noise, structures, resultss, max_atoms_added):
@@ -63,8 +28,8 @@ def is_std_in_bound_par(std_tolerance, noise, structures, resultss, max_atoms_ad
     :param std_tolerance: If positive, multiply by noise to get cutoff. If
         negative, use absolute value of std_tolerance as cutoff.
     :param noise: Noise variance parameter
-    :param structure: Input structure
-    :type structure: FLARE Structure
+    :param structures: [FLARE ASE Atoms]
+    :param resultss: [results]
     :param max_atoms_added: Maximum # of atoms to add
     :return: (True,[-1]) if no atoms are above cutoff, (False,[...]) of the
             top `max_atoms_added` uncertainties
@@ -76,17 +41,141 @@ def is_std_in_bound_par(std_tolerance, noise, structures, resultss, max_atoms_ad
         threshold = std_tolerance * np.abs(noise)
     else:
         threshold = np.abs(std_tolerance)
-
+    stdss = []
+    indexes = []
+    species = []
+    for i, structure in enumerate(structures):
+        stds = np.array([np.max(std_vec) for std_vec in results[i]["stds"]])
+        stdss.append(stds)
+        index = [(i, j) for j in range(len(structure))]
+        indexes.append(index)
+        species.extend(list(structures.numbers))
     # sort max stds
-    nat = len(structure)
-    max_stds = np.zeros((nat))
-    for atom, std in enumerate(structure.stds):
-        max_stds[atom] = np.max(std)
-    stds_sorted = np.argsort(max_stds)
-    target_atoms = list(stds_sorted[-max_atoms_added:])
-
+    stds_sorted = np.argsort(np.array(stdss))[::-1]
     # if above threshold, return atom
-    if max_stds[stds_sorted[-1]] > threshold:
-        return False, target_atoms
+    if stdss[stds_sorted[0]] > threshold:
+        candidates = list(
+            filter(lambda i: stdss[i] > threshold, list(stds_sorted)))
+        # CUR select
+        species = list(set(species))
+        cur_distribution = cur_select(species, structures)
+        counter = 0
+        targets_index = []
+        for candidate in candidates:
+            if counter > max_atoms_added:
+                break
+            else:
+                index = indexes[candidate]
+                ratio = cur_distribution[index]
+                accept = np.random.choice([True, False], p=(ratio, 1 - ratio))
+                if accept:
+                    targets_index.append(index[0], index[1])
+                    counter += 1
+        return False, targets_index
     else:
-        return True, [-1]
+        return True, []
+
+
+def cur_select(species, structures):
+    cur_distribution = {}
+    soap = SOAP(species=species, sigma=0.0875, rcut=10.5,
+                nmax=10, lmax=9, periodic=True, sparse=False, average=False)
+    # decompose to specie type
+    soap_species = {}
+    soap_species_indexes = {}
+    for specie in species:
+        soap_species[specie] = []
+        soap_species_indexes[specie] = []
+    for i, structure in enumerate(structures):
+        soap_structure = soap.create(structure)
+        for j, atom in enumerate(structure):
+            soap_species[atom.number].append(soap_structure[j])
+            soap_species_indexes[atom.number].append((i, j))
+    # cur select in each specie type
+    for specie in species:
+        at_descs = np.array(soap_species[specie]).T
+        m = at_descs
+        k = len(structures)
+        (u, s, vt) = descriptor_svd(m, k)
+        c_scores = np.sum(vt**2, axis=0) / vt.shape[0]
+        # modify distribution to up accept frequency
+        frequent = c_scores * (1 / np.max(c_scores))
+        for n, p in enumerate(frequent):
+            cur_distribution[soap_species_indexes[species]
+                             [n]] = np.clip(p, None, 1)
+    return cur_distribution
+
+
+def descriptor_svd(at_descs, num, do_vectors='vh'):
+    # for sparse matrix
+    def mv(v):
+        return np.dot(at_descs, v)
+
+    def rmv(v):
+        return np.dot(at_descs.T, v)
+
+    A = LinearOperator(at_descs.shape, matvec=mv, rmatvec=rmv, matmat=mv)
+
+    return svds(A, k=num, return_singular_vectors=do_vectors)
+
+
+if __name__ == "__main__":
+    start_time = datetime.datetime.now()
+    # config
+    std_tolerance = 2
+    max_atoms_added = 12
+    # input
+    md_targets_txt = sys.argv[1]
+    expdir = os.path.dirname(md_targets_txt)
+    step_num = int(os.path.basename(
+        md_targets_txt).split(".")[0].split("_")[-1]) + 1
+    log_txt = sys.argv[2]
+    with open(log_txt, "r") as f:
+        tmp = f.readlines()
+        logs = [i.split("\n")[0] for i in tmp]
+    noise = float(logs[-1][:-1].split(",")[-1])
+    # collelct
+    with open(md_targets_txt, "r") as f:
+        tmp = f.readlines()
+        md_targets = [i.split("\n")[0] for i in tmp]
+    # read target
+    structures = []
+    resultss = []
+    next_md_targets = []
+    for i in range(0, len(md_targets), 2):
+        previous_structure_path = md_targets[i]
+        compdir = os.path.dirname(os.path.dirname(previous_structure_path))
+        comp = os.path.basename(compdir)
+        outdir = compdir + "/" + comp + "_" + step_num
+        structure_path = outdir + "/" + comp + "_" + step_num + ".pickle"
+        structure = pd.read_pickle(structure_path)
+        results_path = outdir + "/" + comp + "_" + "gpr" + "_" + step_num + ".pickle"
+        results = pd.read_pickle(results_path)
+        structures.append(structure)
+        next_md_targets.append(structure_path)
+        resultss.append(results)
+        next_md_targets.append(results_path)
+    # check
+    flag, targets_index = is_std_in_bound_par(
+        std_tolerance, noise, structures, resultss, max_atoms_added)
+    # switch
+    dft_targets = []
+    if not flag:
+        structure_indexes = list(set([target_index[0]
+                                      for target_index in targets_index]))
+        for structure_index in structure_indexes:
+            atom_indexes = [target_index[1]
+                            for target_index in targets_index if target_index[0] == structure_index]
+            dft_targets.append(next_md_targets[structure_index * 2])
+            dft_targets.append(atom_indexes)
+            next_md_targets[structure_index * 2 + 1] = re.sub(
+                "_gpr_", "_dft_", next_md_targets[structure_index * 2 + 1])
+
+    # write
+    end_time = datetime.datetime.now()
+    print(*dft_targets, sep="\n", end="\n",
+          file=open(f"{expdir}/dft_targets_{step_num}.txt", "w"))
+    print(*next_md_targets, sep="\n", end="\n",
+          file=open(f"{expdir}/md_targets_{step_num}.txt", "w"))
+    print(*(logs + [f"MDGPR {step_num - 1} end_time {start_time}", f"OTF {step_num} end_time {end_time} {flag}"]),
+          sep="\n", end="\n", file=open(log_txt, "w"))
