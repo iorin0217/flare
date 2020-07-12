@@ -1,8 +1,9 @@
 '''
-python MLE.py gp_{num}.pickle, log.txt
+python MLE.py gp_{num}.pickle log.txt
 '''
 import os
 import sys
+import subprocess
 import datetime
 import numpy as np
 import pandas as pd
@@ -70,3 +71,9 @@ if __name__ == "__main__":
     gp_model.write_model(f'gp_{step_num}', format='pickle')
     print(*(logs + [f"DFT {step_num} end_time {start_time}", f"MLE {step_num} end_time {end_time} start_hyps {start_hyps} end_hyps {end_hyps}"]),
           sep="\n", end="\n", file=open(log_txt, "w"))
+    # submit jobs
+    calc_size = 8
+    job_id = subprocess.run(
+        ["qsub", "-J", f"1-{calc_size}", f"job_MDGPR_{step_num}.sh"], encoding='utf-8', stdout=subprocess.PIPE)
+    subprocess.run(
+        ["qsub", "-W", f"depend=afterok:{job_id.split('.')[0]}:{job_id.split('.')[0]}", f"job_OTF_{step_num + 1}.sh"])
