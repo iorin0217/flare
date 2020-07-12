@@ -28,7 +28,7 @@ if __name__ == "__main__":
     pseudo_files = {"Ba": "Ba.pbe-spn-kjpaw_psl.1.0.0.UPF",
                     "Rh": "Rh.pbe-spn-kjpaw_psl.1.0.0.UPF", "O": "O.pbe-n-kjpaw_psl.0.1.UPF"}
     dft_calc = Espresso(pseudopotentials=pseudo_files, label=input_dir + "/" + label,
-                        tstress=True, tprnfor=True, nosym=True, input_data=input_data, kpts=(8, 8, 8))
+                        tstress=True, tprnfor=True, nosym=True, input_data=input_data, kpts=(6, 6, 6))
     structure.set_calculator(dft_calc)
     # get results
     results = {}
