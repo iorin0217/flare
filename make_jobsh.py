@@ -68,7 +68,7 @@ if __name__ == "__main__":
             [f"#PBS -N DFT_{i}"] + config + DFT
         print(*DFT_sh, sep="\n", end="\n", file=open(f"job_DFT_{i}.sh", "w"))
         MLE = [
-            f"python3 /lustre/{token}/{user}/flare/MLE.py $PBS_O_WORKDIR/gp_{i}.pickle $PBS_O_WORKDIR/log.txt"]
+            f"python3 /lustre/{token}/{user}/flare/MLE.py $PBS_O_WORKDIR/gp_{i-1}.pickle $PBS_O_WORKDIR/log.txt"]
         MLE_sh = header_common + header_MLE + \
             [f"#PBS -N MLE_{i}"] + config + MLE
         print(*MLE_sh, sep="\n", end="\n", file=open(f"job_MLE_{i}.sh", "w"))
