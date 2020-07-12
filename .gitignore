@@ -52,5 +52,5 @@ test_files/qe_output_*.out
 /tests/POSCAR*
 .idea/
 .coverage
-BaRhO
+BaRhO*
 PRE.py

@@ -47,7 +47,8 @@ md_targets_{num}.txt : expdir/{composition0}/{composition0}_{num}/{composition0}
 
 
 if __name__ == "__main__":
-    # python make_jobsh.py token, user, num
+    # python make_jobsh.py token user num
+    # @ want to save dir
     import sys
     token = sys.argv[1]
     user = sys.argv[2]
@@ -62,23 +63,23 @@ if __name__ == "__main__":
               f"source /lustre/{token}/{user}/.bash_profile"]
     for i in range(int(num)):
         DFT = [
-            f'target=`sed -n (2*$PBS_ARRAY_INDEX-1)"P" dft_targets_{num}.txt`', f"python3 /lustre/{token}/{user}/flare/DFT.py $target"]
+            f'target=`sed -n (2*$PBS_ARRAY_INDEX-1)"P" dft_targets_{i}.txt`', f"python3 /lustre/{token}/{user}/flare/DFT.py $target"]
         DFT_sh = header_common + header_DFT + \
-            [f"#PBS -N DFT_{num}"] + config + DFT
-        print(*DFT_sh, sep="\n", end="\n", file=open(f"job_DFT_{num}.sh", "w"))
+            [f"#PBS -N DFT_{i}"] + config + DFT
+        print(*DFT_sh, sep="\n", end="\n", file=open(f"job_DFT_{i}.sh", "w"))
         MLE = [
-            f"python3 /lustre/{token}/{user}/flare/MLE.py $PBS_O_WORKDIR/gp_{num}.pickle $PBS_O_WORKDIR/log.txt"]
+            f"python3 /lustre/{token}/{user}/flare/MLE.py $PBS_O_WORKDIR/gp_{i}.pickle $PBS_O_WORKDIR/log.txt"]
         MLE_sh = header_common + header_MLE + \
-            [f"#PBS -N MLE_{num}"] + config + MLE
-        print(*MLE_sh, sep="\n", end="\n", file=open(f"job_MLE_{num}.sh", "w"))
-        MDGPR = [f'target=`sed -n (2*$PBS_ARRAY_INDEX-1)"P" md_targets_{num}.txt`', f'engine=`sed -n (2*$PBS_ARRAY_INDEX)"P" md_targets_{num}.txt`',
-                 f"python3 /lustre/{token}/{user}/flare/MDGPR.py $target $engine $PBS_O_WORKDIR/gp_{num}.pickle"]
+            [f"#PBS -N MLE_{i}"] + config + MLE
+        print(*MLE_sh, sep="\n", end="\n", file=open(f"job_MLE_{i}.sh", "w"))
+        MDGPR = [f'target=`sed -n (2*$PBS_ARRAY_INDEX-1)"P" md_targets_{i}.txt`', f'engine=`sed -n (2*$PBS_ARRAY_INDEX)"P" md_targets_{i}.txt`',
+                 f"python3 /lustre/{token}/{user}/flare/MDGPR.py $target $engine $PBS_O_WORKDIR/gp_{i}.pickle"]
         MDGPR_sh = header_common + header_MDGPR + \
-            [f"#PBS -N MDGPR_{num}"] + config + MDGPR
+            [f"#PBS -N MDGPR_{i}"] + config + MDGPR
         print(*MDGPR_sh, sep="\n", end="\n",
-              file=open(f"job_MDGPR_{num}.sh", "w"))
-        OTF = [f'target=`sed -n $PBS_ARRAY_INDEX"P" dft_targets_{num}.txt`',
-               f"python3 /lustre/{token}/{user}/flare/OTF.py $PBS_O_WORKDIR/md_targets_{num}.txt $PBS_O_WORKDIR/log.txt"]
+              file=open(f"job_MDGPR_{i}.sh", "w"))
+        OTF = [f'target=`sed -n $PBS_ARRAY_INDEX"P" dft_targets_{i}.txt`',
+               f"python3 /lustre/{token}/{user}/flare/OTF.py $PBS_O_WORKDIR/md_targets_{i}.txt $PBS_O_WORKDIR/log.txt"]
         OTF_sh = header_common + header_OTF + \
-            [f"#PBS -N OTF_{num}"] + config + OTF
-        print(*OTF_sh, sep="\n", end="\n", file=open(f"job_OTF_{num}.sh", "w"))
+            [f"#PBS -N OTF_{i}"] + config + OTF
+        print(*OTF_sh, sep="\n", end="\n", file=open(f"job_OTF_{i}.sh", "w"))
