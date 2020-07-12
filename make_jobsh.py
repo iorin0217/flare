@@ -63,7 +63,7 @@ if __name__ == "__main__":
               f"source /lustre/{token}/{user}/.bash_profile"]
     for i in range(int(num)):
         DFT = [
-            f'target=`sed -n (2*$PBS_ARRAY_INDEX-1)"P" dft_targets_{i}.txt`', f"python3 /lustre/{token}/{user}/flare/DFT.py $target"]
+            f'target=`sed -n $(2*PBS_ARRAY_INDEX-1)"P" dft_targets_{i}.txt`', f"python3 /lustre/{token}/{user}/flare/DFT.py $target"]
         DFT_sh = header_common + header_DFT + \
             [f"#PBS -N DFT_{i}"] + config + DFT
         print(*DFT_sh, sep="\n", end="\n", file=open(f"job_DFT_{i}.sh", "w"))
@@ -72,7 +72,7 @@ if __name__ == "__main__":
         MLE_sh = header_common + header_MLE + \
             [f"#PBS -N MLE_{i}"] + config + MLE
         print(*MLE_sh, sep="\n", end="\n", file=open(f"job_MLE_{i}.sh", "w"))
-        MDGPR = [f'target=`sed -n (2*$PBS_ARRAY_INDEX-1)"P" md_targets_{i}.txt`', f'engine=`sed -n (2*$PBS_ARRAY_INDEX)"P" md_targets_{i}.txt`',
+        MDGPR = [f'target=`sed -n $(2*$PBS_ARRAY_INDEX-1)"P" md_targets_{i}.txt`', f'engine=`sed -n $(2*$PBS_ARRAY_INDEX)"P" md_targets_{i}.txt`',
                  f"python3 /lustre/{token}/{user}/flare/MDGPR.py $target $engine $PBS_O_WORKDIR/gp_{i}.pickle"]
         MDGPR_sh = header_common + header_MDGPR + \
             [f"#PBS -N MDGPR_{i}"] + config + MDGPR
