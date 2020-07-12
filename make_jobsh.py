@@ -1,9 +1,13 @@
 '''
-RSG & CUR step : job_RSGCUR.sh
-    RSG via pyxtal and CUR selection by SOAP kernel via Dscribe
-    input : RSGCUR.json
-        RSGCUR.json : {CUR hyps, SOAP hyps}
-    output : [{composition}_0.pickle], dft_targets_0.txt
+after PRE step, DFT(0) -> MLE(0) -> ...
+imaginary, the first line of log.txt is "OTF 0"
+
+log.txt : OTF 0 end_time YMD HMS False
+          DFT 0 end_time YMD HMS
+          MLE 0 end_time YMD HMS start_hyps [1, 2, 3, 4, 5] end_hyps [1, 2, 4, 6, 8]
+          MDGPR 0 end_time YMD HMS
+          OTF 1 end_time YMD HMS True
+          DFT 1 ...
 
 DFT step : job_DFT.sh
     DFT via ASE array job
@@ -26,13 +30,6 @@ OTF step : job_OTF.sh
     input : md_targets_{num}.txt, log.txt
     output : md_targets_{num+1}.txt, dft_targets_{num+1}.txt, log.txt
 
-log.txt : OTF 0 end_time YMD HMS True
-          DFT 0 end_time YMD HMS
-          MLE 0 end_time YMD HMS start_hyps [1, 2, 3, 4, 5] end_hyps [1, 2, 4, 6, 8]
-          MDGPR 0 end_time YMD HMS
-          OTF 1 end_time YMD HMS False
-          DFT 1 ...
-
 dft_targets_{num}.txt : expdir/{composition0}/{composition0}_{num}/{composition0}_{num}.pickle
                         [0, 2, 4, 5]
                         expdir/{composition1}/{composition1}_{num}/{composition1}_{num}.pickle
@@ -44,11 +41,4 @@ md_targets_{num}.txt : expdir/{composition0}/{composition0}_{num}/{composition0}
                        expdir/{composition1}/{composition1}_{num}/{composition1}_{num}.pickle
                        expdir/{composition1}/{composition1}_{num}/{composition1}_{method}_{num}.pickle
                        ...
-
-
-MHM step : job_MHM.sh
-    RSG via pyxtal and MHM via ASE array by MGP via LAMMPS
-
-TI & TPT step : job_TITPT.sh
-    TI and TPT by MGP via LAMMPS
 '''

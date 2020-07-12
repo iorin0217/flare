@@ -5,6 +5,7 @@ import os
 import sys
 import datetime
 import pandas as pd
+from flare.ase.atoms import FLARE_Atoms
 from flare.ase.calculator import FLARE_Calculator
 from flare.gp import GaussianProcess
 from ase import units

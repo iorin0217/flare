@@ -9,6 +9,7 @@ import pandas as pd
 import numpy as np
 from dscribe.descriptors import SOAP
 from scipy.sparse.linalg import LinearOperator, svds
+from flare.ase.atoms import FLARE_Atoms
 
 
 def is_std_in_bound_par(std_tolerance, noise, structures, resultss, max_atoms_added):
@@ -123,7 +124,7 @@ if __name__ == "__main__":
     start_time = datetime.datetime.now()
     # config
     std_tolerance = 2
-    max_atoms_added = 12
+    max_atoms_added = 8
     # input
     md_targets_txt = sys.argv[1]
     expdir = os.path.dirname(md_targets_txt)
