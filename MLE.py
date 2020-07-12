@@ -24,10 +24,10 @@ if __name__ == "__main__":
         hm = pm.as_dict()
         hyps = hm['hyps']
         cut = hm['cutoffs']
-        print('hyps', hyps)
         gp_model = GaussianProcess(kernels=kernels, component='mc', hyps=hyps, cutoffs=cut, hyp_labels=[
             'sig2', 'ls2', 'sig3', 'ls3', 'noise'], opt_algorithm='L-BFGS-B', n_cpus=32, maxiter=100)
-    gp_model = GaussianProcess.from_file(gp_pickle)
+    else:
+        gp_model = GaussianProcess.from_file(gp_pickle)
     start_hyps = gp_model.hyps
     log_txt = sys.argv[2]
     exp_path = os.path.dirname(log_txt)
