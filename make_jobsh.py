@@ -63,7 +63,7 @@ if __name__ == "__main__":
               f"source /lustre/{token}/{user}/.bash_profile"]
     for i in range(int(num)):
         DFT = [
-            f'target=`sed -n $(2*PBS_ARRAY_INDEX-1)"P" dft_targets_{i}.txt`', f"python3 /lustre/{token}/{user}/flare/DFT.py $target"]
+            f'target=`sed -n $((2*PBS_ARRAY_INDEX-1))"P" dft_targets_{i}.txt`', f"python3 /lustre/{token}/{user}/flare/DFT.py $target"]
         DFT_sh = header_common + header_DFT + \
             [f"#PBS -N DFT_{i}"] + config + DFT
         print(*DFT_sh, sep="\n", end="\n", file=open(f"job_DFT_{i}.sh", "w"))
