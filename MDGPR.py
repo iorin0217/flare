@@ -52,7 +52,7 @@ if __name__ == "__main__":
     md_end_time = datetime.datetime.now()
     # record_state
     md_log = [f"md_start_time : {md_start_time}", f"md_end_time : {md_end_time}", f"gibbs_free_energy : {md.get_gibbs_free_energy()}", f"total_energy : {structure.get_total_energy()}",
-              f"kinetic_energy : {structure.get_kinetic_energy()}", f"temperature : {structure.get_temperature}", structure.get_velocities()]
+              f"kinetic_energy : {structure.get_kinetic_energy()}", f"temperature : {structure.get_temperature()}", structure.get_velocities()]
     print(*md_log, sep="\n", end="\n",
           file=open(f"{outdir}/md_log_{step_num}.txt", "w"))
     del flare_calculator_MD  # for memory save

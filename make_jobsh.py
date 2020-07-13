@@ -28,8 +28,8 @@ MD & GPR step : job_MDGPR.sh
 
 OTF step : job_OTF.sh
     collect results and decide wheter to perform DFT
-    input : md_targets_{num}.txt, log.txt
-    output : md_targets_{num+1}.txt, dft_targets_{num+1}.txt, log.txt
+    input : md_targets_{num-1}.txt, log.txt
+    output : md_targets_{num}.txt, dft_targets_{num+1}.txt, log.txt
     submit : DFT_{num} array -> MLE_{num}
 
 dft_targets_{num}.txt : expdir/{composition0}/{composition0}_{num}/{composition0}_{num}.pickle
@@ -79,7 +79,7 @@ if __name__ == "__main__":
         print(*MDGPR_sh, sep="\n", end="\n",
               file=open(f"job_MDGPR_{i}.sh", "w"))
         OTF = [
-            f"python3 /lustre/{token}/{user}/flare/OTF.py $PBS_O_WORKDIR/md_targets_{i}.txt $PBS_O_WORKDIR/log.txt"]
+            f"python3 /lustre/{token}/{user}/flare/OTF.py $PBS_O_WORKDIR/md_targets_{i - 1}.txt $PBS_O_WORKDIR/log.txt"]
         OTF_sh = header_common + header_OTF + \
             [f"#PBS -N OTF_{i}"] + config + OTF
         print(*OTF_sh, sep="\n", end="\n", file=open(f"job_OTF_{i}.sh", "w"))
