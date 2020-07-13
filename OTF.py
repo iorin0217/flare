@@ -51,7 +51,7 @@ def is_std_in_bound_par(std_tolerance, noise, structures, resultss, max_atoms_ad
         stdss.append(stds)
         index = [(i, j) for j in range(len(structure))]
         indexes.append(index)
-        species.extend(list(structures.numbers))
+        species.extend(list(structure.numbers))
     # sort max stds
     stds_sorted = np.argsort(np.array(stdss))[::-1]
     # if above threshold, return atom
