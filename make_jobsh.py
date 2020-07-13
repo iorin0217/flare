@@ -29,7 +29,7 @@ MD & GPR step : job_MDGPR.sh
 OTF step : job_OTF.sh
     collect results and decide wheter to perform DFT
     input : md_targets_{num-1}.txt, log.txt
-    output : md_targets_{num}.txt, dft_targets_{num+1}.txt, log.txt
+    output : md_targets_{num}.txt, dft_targets_{num}.txt, log.txt
     submit : DFT_{num} array -> MLE_{num}
 
 dft_targets_{num}.txt : expdir/{composition0}/{composition0}_{num}/{composition0}_{num}.pickle

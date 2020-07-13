@@ -1,5 +1,5 @@
 '''
-python OTF.py md_targets_{num}.txt, log.txt
+python OTF.py md_targets_{num-1}.txt, log.txt
 '''
 import os
 import re
@@ -148,10 +148,11 @@ if __name__ == "__main__":
         previous_structure_path = md_targets[i]
         compdir = os.path.dirname(os.path.dirname(previous_structure_path))
         comp = os.path.basename(compdir)
-        outdir = compdir + "/" + comp + "_" + step_num
-        structure_path = outdir + "/" + comp + "_" + step_num + ".pickle"
+        outdir = compdir + "/" + comp + "_" + str(step_num)
+        structure_path = outdir + "/" + comp + "_" + str(step_num) + ".pickle"
         structure = pd.read_pickle(structure_path)
-        results_path = outdir + "/" + comp + "_" + "gpr" + "_" + step_num + ".pickle"
+        results_path = outdir + "/" + comp + "_" + \
+            "gpr" + "_" + str(step_num) + ".pickle"
         results = pd.read_pickle(results_path)
         structures.append(structure)
         next_md_targets.append(structure_path)
