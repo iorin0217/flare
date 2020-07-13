@@ -50,7 +50,7 @@ def is_std_in_bound_par(std_tolerance, noise, structures, resultss, max_atoms_ad
         stds = np.array([np.max(std_vec) for std_vec in resultss[i]["stds"]])
         stdss.extend(stds)
         index = [(i, j) for j in range(len(structure))]
-        indexes.append(index)
+        indexes.extend(index)
         species.extend(list(structure.numbers))
     # sort max stds
     stds_sorted = np.argsort(np.array(stdss))[::-1]
