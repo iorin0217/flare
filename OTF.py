@@ -183,7 +183,7 @@ if __name__ == "__main__":
     print(*(logs + [f"MDGPR {step_num - 1} end_time {start_time}", f"OTF {step_num} end_time {end_time} {flag}"]),
           sep="\n", end="\n", file=open(log_txt, "w"))
     # submit jobs
-    calc_size = len(dft_targets / 2)
+    calc_size = len(dft_targets) / 2
     if calc_size == 0:
         subprocess.run(["qsub", f"job_MLE_{step_num}.sh"])
     else:
