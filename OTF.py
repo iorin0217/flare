@@ -64,7 +64,7 @@ def is_std_in_bound_par(std_tolerance, noise, structures, resultss, max_atoms_ad
         counter = 0
         targets_index = []
         for candidate in candidates:
-            if counter > max_atoms_added:
+            if counter - 1 > max_atoms_added:
                 break
             else:
                 index = indexes[candidate]
@@ -183,7 +183,7 @@ if __name__ == "__main__":
     print(*(logs + [f"MDGPR {step_num - 1} end_time {start_time}", f"OTF {step_num} end_time {end_time} {flag}"]),
           sep="\n", end="\n", file=open(log_txt, "w"))
     # submit jobs
-    calc_size = len(dft_targets) / 2
+    calc_size = int(len(dft_targets) / 2)
     if calc_size == 0:
         subprocess.run(["qsub", f"job_MLE_{step_num}.sh"])
     else:
