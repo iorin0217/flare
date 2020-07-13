@@ -1,11 +1,12 @@
 import os
 import numpy as np
 from ase import io, units
+from ase.units import kB
 from ase.optimize import QuasiNewton
-from ase.parallel import paropen, rank, world
-from ase.md import VelocityVerlet
+from ase.parallel import paropen, world
+from ase.md.npt import NPT
 from ase.md import MDLogger
-import tsase
+from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
 
 
 class MinimaHopping:
@@ -18,23 +19,19 @@ class MinimaHopping:
 
     _default_settings = {
         'T0': 1000.,  # K, initial MD 'temperature'
-        'beta1': 1.04,  # temperature adjustment parameter
-        'beta2': 1.04,  # temperature adjustment parameter
-        'beta3': 1. / 1.04,  # temperature adjustment parameter
+        'beta1': 1.1,  # temperature adjustment parameter
+        'beta2': 1.1,  # temperature adjustment parameter
+        'beta3': 1. / 1.1,  # temperature adjustment parameter
         'Ediff0': 0.5,  # eV, initial energy acceptance threshold
         'alpha1': 0.98,  # energy threshold adjustment parameter
         'alpha2': 1. / 0.98,  # energy threshold adjustment parameter
         'mdmin': 2,  # criteria to stop MD simulation (no. of minima)
         'logfile': 'hop.log',  # text log
-        'minima_threshold': 0.01,  # A, threshold for identical configs
-        'timestep': 0.1,  # fs, timestep for MD simulations
+        'minima_threshold': 0.5,  # A, threshold for identical configs
+        'timestep': 1.0,  # fs, timestep for MD simulations
         'optimizer': QuasiNewton,  # local optimizer to use
         'minima_traj': 'minima.traj',  # storage file for minima list
-        'fmax': 0.05,  # eV/A, max force for optimizations
-        'dimer_a': 0.001,  # dimer adjustment parameter
-        'dimer_d': 0.01,  # dimer adjustment parameter
-        'dimer_steps': 40  # number of dimer iterations
-    }
+        'fmax': 0.05}  # eV/A, max force for optimizations
 
     def __init__(self, atoms, **kwargs):
         """Initialize with an ASE atoms object and keyword arguments."""
@@ -42,7 +39,7 @@ class MinimaHopping:
         for key in kwargs:
             if key not in self._default_settings:
                 raise RuntimeError('Unknown keyword: %s' % key)
-        for k, v in list(self._default_settings.items()):
+        for k, v in self._default_settings.items():
             setattr(self, '_%s' % k, kwargs.pop(k, v))
 
         # when a MD sim. has passed a local minimum:
@@ -54,7 +51,7 @@ class MinimaHopping:
         self._temperature = self._T0
         self._Ediff = self._Ediff0
 
-    def __call__(self, totalsteps=None, maxtemp=None, minEnergy=None):
+    def __call__(self, totalsteps=None, maxtemp=None):
         """Run the minima hopping algorithm. Can specify stopping criteria
         with total steps allowed or maximum searching temperature allowed.
         If neither is specified, runs indefinitely (or until stopped by
@@ -66,12 +63,7 @@ class MinimaHopping:
                           '%i allowed. Increase totalsteps if resuming.'
                           % (self._counter, totalsteps))
                 return
-            if (self._atoms.get_potential_energy() <= minEnergy):
-                self._log('msg', 'Run terminated. Step #%i reached of '
-                          '%i allowed. Global optimum found.'
-                          % (self._counter, totalsteps))
-                return
-            if (maxtemp and self._temperature >= maxtemp or self._temperature <= 1.0):
+            if (maxtemp and self._temperature >= maxtemp):
                 self._log('msg', 'Run terminated. Temperature is %.2f K;'
                           ' max temperature allowed %.2f K.'
                           % (self._temperature, maxtemp))
@@ -79,22 +71,7 @@ class MinimaHopping:
 
             self._previous_optimum = self._atoms.copy()
             self._previous_energy = self._atoms.get_potential_energy()
-            dimer = ModifiedDimer()
-            N = dimer(self._previous_optimum, self._counter, self._dimer_a,
-                      self._dimer_d, self._dimer_steps)
-            if (maxtemp and np.isnan(self._temperature) or self._temperature <= 1.0):
-                self._log('msg', 'Run terminated. System exploded;'
-                          ' max temperature allowed %.2f K.'
-                          % (self._temperature, maxtemp))
-                print('Run terminated. System exploded')
-                return
-            self._molecular_dynamics(N)
-            if (maxtemp and np.isnan(self._temperature) or self._temperature <= 1.0):
-                self._log('msg', 'Run terminated. System exploded;'
-                          ' max temperature allowed %.2f K.'
-                          % (self._temperature, maxtemp))
-                print('Run terminated. System exploded')
-                return
+            self._molecular_dynamics()
             self._optimize()
             self._counter += 1
             self._check_results()
@@ -105,7 +82,7 @@ class MinimaHopping:
 
         status = np.array(-1.)
         exists = self._read_minima()
-        if rank == 0:
+        if world.rank == 0:
             if not exists:
                 # Fresh run with new minima file.
                 status = np.array(0.)
@@ -146,8 +123,8 @@ class MinimaHopping:
         mdcount, qncount = 0, 0
         for line in lines:
             if (line[:4] == 'par:') and ('Ediff' not in line):
-                self._temperature = eval(line.split()[1])
-                self._Ediff = eval(line.split()[2])
+                self._temperature = float(line.split()[1])
+                self._Ediff = float(line.split()[2])
             elif line[:18] == 'msg: Optimization:':
                 qncount = int(line[19:].split('qn')[1])
             elif line[:24] == 'msg: Molecular dynamics:':
@@ -158,13 +135,13 @@ class MinimaHopping:
             # max steps.
             self._log('msg', 'Attempting to resume at qn%05i' % qncount)
             if qncount > 0:
-                atoms = io.read('qn.traj', index=-1)
+                atoms = io.read('qn%05i.traj' % (qncount - 1), index=-1)
                 self._previous_optimum = atoms.copy()
                 self._previous_energy = atoms.get_potential_energy()
-            if os.path.getsize('qn.traj') > 0:
-                atoms = io.read('qn.traj', index=-1)
+            if os.path.getsize('qn%05i.traj' % qncount) > 0:
+                atoms = io.read('qn%05i.traj' % qncount, index=-1)
             else:
-                atoms = io.read('md.traj', index=-3)
+                atoms = io.read('md%05i.traj' % qncount, index=-3)
             self._atoms.positions = atoms.get_positions()
             fmax = np.sqrt((atoms.get_forces() ** 2).sum(axis=1).max())
             if fmax < self._fmax:
@@ -185,7 +162,7 @@ class MinimaHopping:
         elif qncount < mdcount:
             # Probably stopped during molecular dynamics.
             self._log('msg', 'Attempting to resume at md%05i.' % mdcount)
-            atoms = io.read('qn.traj', index=-1)
+            atoms = io.read('qn%05i.traj' % qncount, index=-1)
             self._previous_optimum = atoms.copy()
             self._previous_energy = atoms.get_potential_energy()
             self._molecular_dynamics(resume=mdcount)
@@ -198,8 +175,7 @@ class MinimaHopping:
 
         # No prior minima found?
         self._read_minima()
-        # if len(self._minima) == 0:
-        if self._previous_energy is None:
+        if len(self._minima) == 0:
             self._log('msg', 'Found a new minimum.')
             self._log('msg', 'Accepted new minimum.')
             self._record_minimum()
@@ -207,12 +183,9 @@ class MinimaHopping:
             return
         # Returned to starting position?
         if self._previous_optimum:
-            #compare = ComparePositions(translate=False)
-            compare2 = CompareEnergies()
-            dmax = compare2(self._atoms, self._previous_optimum)
-            #self._log('msg', 'Max distance to last minimum: %.3f A' % dmax)
-            self._log(
-                'msg', 'Absolute energy difference to last minimum: %.3f eV' % dmax)
+            compare = ComparePositions(translate=False)
+            dmax = compare(self._atoms, self._previous_optimum)
+            self._log('msg', 'Max distance to last minimum: %.3f A' % dmax)
             if dmax < self._minima_threshold:
                 self._log('msg', 'Re-found last minimum.')
                 self._temperature *= self._beta1
@@ -220,8 +193,7 @@ class MinimaHopping:
                 return
         # In a previously found position?
         unique, dmax_closest = self._unique_minimum_position()
-        # self._log('msg', 'Max distance to closest minimum: %.3f A' %
-        self._log('msg', 'Absolute energy difference to local minimum: %.3f eV' %
+        self._log('msg', 'Max distance to closest minimum: %.3f A' %
                   dmax_closest)
         if not unique:
             self._temperature *= self._beta2
@@ -235,8 +207,9 @@ class MinimaHopping:
         self._temperature *= self._beta3
         self._log('msg', 'Found a new minimum.')
         self._log('par')
-        if (self._atoms.get_potential_energy() <
-                self._previous_energy + self._Ediff):
+        if (self._previous_energy is None or
+            (self._atoms.get_potential_energy() <
+                self._previous_energy + self._Ediff)):
             self._log('msg', 'Accepted new minimum.')
             self._Ediff *= self._alpha1
             self._log('par')
@@ -251,7 +224,7 @@ class MinimaHopping:
     def _log(self, cat='msg', message=None):
         """Records the message as a line in the log file."""
         if cat == 'init':
-            if rank == 0:
+            if world.rank == 0:
                 if os.path.exists(self._logfile):
                     raise RuntimeError('File exists: %s' % self._logfile)
             f = paropen(self._logfile, 'w')
@@ -281,12 +254,9 @@ class MinimaHopping:
     def _optimize(self):
         """Perform an optimization."""
         self._atoms.set_momenta(np.zeros(self._atoms.get_momenta().shape))
-        if (self._counter > 1):
-            os.remove('qn.log')
-            os.remove('qn.traj')
         opt = self._optimizer(self._atoms,
-                              trajectory='qn.traj',
-                              logfile='qn.log')
+                              trajectory='qn%05i.traj' % self._counter,
+                              logfile='qn%05i.log' % self._counter)
         self._log('msg', 'Optimization: qn%05i' % self._counter)
         opt.run(fmax=self._fmax)
         self._log('ene')
@@ -303,7 +273,6 @@ class MinimaHopping:
         exists = os.path.exists(self._minima_traj)
         if exists:
             empty = os.path.getsize(self._minima_traj) == 0
-        if os.path.exists(self._minima_traj):
             if not empty:
                 traj = io.Trajectory(self._minima_traj, 'r')
                 self._minima = [atoms for atoms in traj]
@@ -314,7 +283,7 @@ class MinimaHopping:
             self._minima = []
             return False
 
-    def _molecular_dynamics(self, N, resume=None):
+    def _molecular_dynamics(self, resume=None):
         """Performs a molecular dynamics simulation, until mdmin is
         exceeded. If resuming, the file number (md%05i) is expected."""
         self._log('msg', 'Molecular dynamics: md%05i' % self._counter)
@@ -323,12 +292,12 @@ class MinimaHopping:
         thermalized = False
         if resume:
             self._log('msg', 'Resuming MD from md%05i.traj' % resume)
-            if os.path.getsize('md.traj') == 0:
+            if os.path.getsize('md%05i.traj' % resume) == 0:
                 self._log('msg', 'md%05i.traj is empty. Resuming from '
                           'qn%05i.traj.' % (resume, resume - 1))
-                atoms = io.read('qn.traj', index=-1)
+                atoms = io.read('qn%05i.traj' % (resume - 1), index=-1)
             else:
-                images = io.Trajectory('md.traj' % resume, 'r')
+                images = io.Trajectory('md%05i.traj' % resume, 'r')
                 for atoms in images:
                     energies.append(atoms.get_potential_energy())
                     oldpositions.append(atoms.positions.copy())
@@ -341,15 +310,15 @@ class MinimaHopping:
             self._log('msg', 'Starting MD with %i existing energies.' %
                       len(energies))
         if not thermalized:
-            self.MaxwellBoltzmannDistribution(
-                self._atoms, N, temp=self._temperature * units.kB, force_temp=True)
-        if (self._counter > 1):
-            os.remove('md.log')
-            os.remove('md.traj')
-        traj = io.Trajectory('md.traj', 'a', self._atoms)
-        dyn = VelocityVerlet(self._atoms, dt=self._timestep * units.fs)
-        log = MDLogger(dyn, self._atoms, 'md.log',
-                       header=True, stress=False, peratom=False)
+            MaxwellBoltzmannDistribution(self._atoms,
+                                         temp=self._temperature * units.kB,
+                                         force_temp=True)
+        traj = io.Trajectory('md%05i.traj' % self._counter, 'a',
+                             self._atoms)
+        dyn = NPT(self._atoms, timestep=self._timestep * units.fs,
+                  temperature=self._temperature * kB, externalstress=0.06, ttime=None, pfactor=3375)
+        log = MDLogger(dyn, self._atoms, 'md%05i.log' % self._counter,
+                       header=True, stress=True, peratom=False)
         dyn.attach(log, interval=1)
         dyn.attach(traj, interval=1)
         while mincount < self._mdmin:
@@ -367,8 +336,7 @@ class MinimaHopping:
         a local minima, has been found before."""
         unique = True
         dmax_closest = 99999.
-        #compare = ComparePositions(translate=True)
-        compare = CompareEnergies()
+        compare = ComparePositions(translate=True)
         self._read_minima()
         for minimum in self._minima:
             dmax = compare(minimum, self._atoms)
@@ -377,105 +345,6 @@ class MinimaHopping:
             if dmax < dmax_closest:
                 dmax_closest = dmax
         return unique, dmax_closest
-
-    def _maxwellboltzmanndistribution(self, masses, N, temp, communicator=world):
-        # For parallel GPAW simulations, the random velocities should be
-        # distributed.  Uses gpaw world communicator as default, but allow
-        # option of specifying other communicator (for ensemble runs)
-        xi = np.random.standard_normal((len(masses), 3))
-        if N is not None:
-            xi = N
-            #momenta = 3 * len(masses) * xi * np.sqrt(2 * masses * temp)[:, np.newaxis]
-            momenta = xi * np.sqrt((3/2) * len(masses) * masses *
-                                   (self._temperature * units.kB))[:, np.newaxis]
-        else:
-            momenta = xi * np.sqrt(masses * temp)[:, np.newaxis]
-        communicator.broadcast(xi, 0)
-        return momenta
-
-    def MaxwellBoltzmannDistribution(self, atoms, N, temp, communicator=world,
-                                     force_temp=False):
-        """Sets the momenta to a Maxwell-Boltzmann distribution. temp should be
-        fed in energy units; i.e., for 300 K use temp=300.*units.kB. If
-        force_temp is set to True, it scales the random momenta such that the
-        temperature request is precise.
-        """
-        momenta = self._maxwellboltzmanndistribution(atoms.get_masses(), N, temp,
-                                                     communicator)
-        atoms.set_momenta(momenta)
-        if force_temp:
-            temp0 = atoms.get_kinetic_energy() / len(atoms) / 1.5
-            gamma = temp / temp0
-            atoms.set_momenta(atoms.get_momenta() * np.sqrt(gamma))
-
-
-class ModifiedDimer:
-    # Class that moves the initial velocity vector of a MD escape trial
-    # toward a direction with low curvature
-    def __call__(self, atoms, counter, dimer_a, dimer_d, dimer_steps):
-        p = atoms.copy()
-        count = counter
-        oldPos = atoms.get_positions()
-        lj = tsase.calculators.lj(cutoff=35.0)
-        p.set_calculator(lj)
-        N = self.gradientDimer(p, count, dimer_a, dimer_d, dimer_steps)
-        atoms.set_positions(oldPos)
-        return N
-
-    def perpForce(self, p, N):
-        # function that calculates the perpendicular force
-        force = p.get_forces()
-        f = force - np.vdot(force, N) * N
-        return f
-
-    def escapeDirection(self, x, y):
-        # function that calculates the escape direction vector
-        diff = y - x
-        return diff / np.linalg.norm(diff)
-
-    def gradientDimer(self, p, count, dimer_a, dimer_d, dimer_steps):
-        localOpt = tsase.optimize.SDLBFGS(p, logfile=None)
-        localOpt.run()
-        x = p.get_positions()
-        a = dimer_a
-        d = dimer_d
-        # random uniform vector
-        N = np.random.uniform(-1, 1, (len(p), 3))
-        N = N / np.linalg.norm(N)
-        y = x + d * N
-        p.set_positions(y)
-        maxIteration = dimer_steps
-        iteration = 0
-
-        # After a few steps the iteration is stopped before a locally
-        # optimal lowest curvature mode is found
-        while iteration < maxIteration:
-            f = self.perpForce(p, N)
-            y = y + a * f
-            N = self.escapeDirection(x, y)
-            y = x + d * N
-            p.set_positions(y)
-            iteration += 1
-        return N
-
-
-class CompareEnergies:
-    # Class that compares the potential energy of 'M' and 'Mcurrent'
-    # or 'M' with all other local minima perviously found
-
-    def __call__(self, atoms1, atoms2):
-        atoms1 = atoms1.copy()
-        atoms2 = atoms2.copy()
-        dmax = self._indistinguishable_compare(atoms1, atoms2)
-        return dmax
-
-    def _indistinguishable_compare(self, atoms1, atoms2):
-        lj = tsase.calculators.lj()
-        atoms1.set_calculator(lj)
-        atoms2.set_calculator(lj)
-        difference = atoms2.get_potential_energy() - atoms1.get_potential_energy()
-        dmax = np.absolute(difference)
-        return dmax
 
 
 class ComparePositions:
@@ -693,7 +562,7 @@ class MHPlot:
         tempax.set_ylabel('$T$, K')
         ediffax.set_ylabel(r'$E_\mathrm{diff}$, eV')
         for ax in [ax1, ax2]:
-            ax.set_ylabel('r$E_\mathrm{pot}$, eV')
+            ax.set_ylabel(r'$E_\mathrm{pot}$, eV')
         ax = CombinedAxis(ax1, ax2, tempax, ediffax)
         self._set_zoomed_range(ax)
         ax1.spines['top'].set_visible(False)

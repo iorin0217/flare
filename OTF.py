@@ -191,17 +191,3 @@ if __name__ == "__main__":
             ["qsub", "-J", f"1-{calc_size}", f"job_DFT_{step_num}.sh"], encoding='utf-8', stdout=subprocess.PIPE)
         subprocess.run(
             ["qsub", "-W", f"depend=afterok:{job_id.stdout.split('.')[0]}", f"job_MLE_{step_num}.sh"])
-    '''
-    elif 0 < calc_size < 5:
-        job_id_first = subprocess.run(
-            ["qsub", "-l", f"select={calc_size}:ncpus=36:mpiprocs=32:ompthreads=1", "-J", f"1-{calc_size}", f"job_DFT_{step_num}_first.sh"], encoding='utf-8', stdout=subprocess.PIPE)
-        subprocess.run(
-            ["qsub", "-W", f"depend=afterok:{job_id_first.split('.')[0]}", f"job_MLE_{step_num}.sh"])
-    elif calc_size > 4:
-        job_id_first = subprocess.run(
-            ["qsub", "-l", f"select={calc_size}:ncpus=36:mpiprocs=32:ompthreads=1", "-J", f"1-4", f"job_DFT_{step_num}_first.sh"], encoding='utf-8', stdout=subprocess.PIPE)
-        job_id_second = subprocess.run(
-            ["qsub", "-l", f"select={calc_size-4}:ncpus=36:mpiprocs=32:ompthreads=1", "-J", f"5-{calc_size}", f"job_DFT_{step_num}_second.sh"], encoding='utf-8', stdout=subprocess.PIPE)
-        subprocess.run(
-            ["qsub", "-W", f"depend=afterok:{job_id_first.split('.')[0]}", f"job_MLE_{step_num}.sh"])
-    '''
