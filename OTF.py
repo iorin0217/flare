@@ -189,7 +189,7 @@ if __name__ == "__main__":
         job_id = subprocess.run(
             ["qsub", "-J", f"1-{calc_size}", f"job_DFT_{step_num}.sh"], encoding='utf-8', stdout=subprocess.PIPE)
         subprocess.run(
-            ["qsub", "-W", f"depend=afterok:{job_id('.')[0]}", f"job_MLE_{step_num}.sh"])
+            ["qsub", "-W", f"depend=afterok:{job_id.stdout.split('.')[0]}", f"job_MLE_{step_num}.sh"])
     '''
     elif 0 < calc_size < 5:
         job_id_first = subprocess.run(
