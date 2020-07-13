@@ -28,7 +28,7 @@ if __name__ == "__main__":
             'sig2', 'ls2', 'sig3', 'ls3', 'noise'], opt_algorithm='L-BFGS-B', n_cpus=32, maxiter=100)
     else:
         gp_model = GaussianProcess.from_file(gp_pickle)
-    start_hyps = gp_model.hyps
+    start_hyps = list(gp_model.hyps)
     log_txt = sys.argv[2]
     exp_path = os.path.dirname(log_txt)
     with open(log_txt, "r") as f:
@@ -67,7 +67,7 @@ if __name__ == "__main__":
         gp_model.train(print_progress=True)
     # save
     end_time = datetime.datetime.now()
-    end_hyps = gp_model.hyps
+    end_hyps = list(gp_model.hyps)
     gp_model.write_model(f'gp_{step_num}', format='pickle')
     print(*(logs + [f"DFT {step_num} end_time {start_time}", f"MLE {step_num} end_time {end_time} start_hyps {start_hyps} end_hyps {end_hyps}"]),
           sep="\n", end="\n", file=open(log_txt, "w"))
