@@ -71,7 +71,7 @@ def is_std_in_bound_par(std_tolerance, noise, structures, resultss, max_atoms_ad
                 ratio = cur_distribution[index]
                 accept = np.random.choice([True, False], p=(ratio, 1 - ratio))
                 if accept:
-                    targets_index.append(index[0], index[1])
+                    targets_index.append(index)
                     counter += 1
         return False, targets_index
     else:
