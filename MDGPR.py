@@ -44,11 +44,11 @@ if __name__ == "__main__":
     else:
         temperature, pressure = 0.12926, 0.0
     structure.set_calculator(flare_calculator_MD)
-    md = NPT(atoms=structure, timestep=5 * units.fs, temperature=temperature,
+    md = NPT(atoms=structure, timestep=1 * units.fs, temperature=temperature,
              externalstress=pressure, ttime=None, pfactor=3375)
     # run MD
     md_start_time = datetime.datetime.now()
-    md.run(2)
+    md.run(1)
     md_end_time = datetime.datetime.now()
     # record_state
     md_log = [f"md_start_time : {md_start_time}", f"md_end_time : {md_end_time}", f"gibbs_free_energy : {md.get_gibbs_free_energy()}", f"total_energy : {structure.get_total_energy()}",
