@@ -48,7 +48,7 @@ def is_std_in_bound_par(std_tolerance, noise, structures, resultss, max_atoms_ad
     species = []
     for i, structure in enumerate(structures):
         stds = np.array([np.max(std_vec) for std_vec in resultss[i]["stds"]])
-        stdss.append(stds)
+        stdss.extend(stds)
         index = [(i, j) for j in range(len(structure))]
         indexes.append(index)
         species.extend(list(structure.numbers))
