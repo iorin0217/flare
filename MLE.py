@@ -76,4 +76,4 @@ if __name__ == "__main__":
     job_id = subprocess.run(
         ["qsub", "-J", f"1-{calc_size}", f"job_MDGPR_{step_num}.sh"], encoding='utf-8', stdout=subprocess.PIPE)
     subprocess.run(
-        ["qsub", "-W", f"depend=afterok:{job_id.stdout.split('.')[0]}:{job_id.split('.')[0]}", f"job_OTF_{step_num + 1}.sh"])
+        ["qsub", "-W", f"depend=afterok:{job_id.stdout.split('.')[0]}:{job_id.stdout.split('.')[0]}", f"job_OTF_{step_num + 1}.sh"])

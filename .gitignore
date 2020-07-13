@@ -54,3 +54,4 @@ test_files/qe_output_*.out
 .coverage
 BaRhO*
 PRE.py
+first.txt

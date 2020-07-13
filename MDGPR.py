@@ -64,7 +64,7 @@ if __name__ == "__main__":
     structure.set_calculator(flare_calculator_GPR)
     structure.calc.calculate(structure)
     # save structure and efs
-    new_dir = compdir + "/" + comp + "_" + (step_num + 1)
+    new_dir = compdir + "/" + comp + "_" + str(step_num + 1)
     os.mkdir(new_dir)
     pd.to_pickle(structure, f"{new_dir}/{comp}_{step_num + 1}.pickle")
     results = structure.calc.show_results
