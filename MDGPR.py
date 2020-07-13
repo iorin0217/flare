@@ -67,5 +67,5 @@ if __name__ == "__main__":
     new_dir = compdir + "/" + comp + "_" + str(step_num + 1)
     os.mkdir(new_dir)
     pd.to_pickle(structure, f"{new_dir}/{comp}_{step_num + 1}.pickle")
-    results = structure.calc.show_results
+    results = structure.calc.show_results()
     pd.to_pickle(results, f"{new_dir}/{comp}_gpr_{step_num + 1}.pickle")
