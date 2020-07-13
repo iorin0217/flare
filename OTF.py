@@ -103,7 +103,7 @@ def cur_select(species, structures):
         # modify distribution to up accept frequency
         frequent = c_scores * (1 / np.max(c_scores))
         for n, p in enumerate(frequent):
-            cur_distribution[soap_species_indexes[species]
+            cur_distribution[soap_species_indexes[specie]
                              [n]] = np.clip(p, None, 1)
     return cur_distribution
 
