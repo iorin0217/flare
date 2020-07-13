@@ -64,7 +64,7 @@ if __name__ == "__main__":
         gp_model.set_L_alpha()
     # update hyps
     if step_num % 50 == 0:
-        gp_model.train()
+        gp_model.train(print_progress=True)
     # save
     end_time = datetime.datetime.now()
     end_hyps = gp_model.hyps
