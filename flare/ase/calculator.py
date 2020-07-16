@@ -122,7 +122,7 @@ class FLARE_Calculator(Calculator):
     def calculate_gp(self, atoms):
         if self.par:
             res = predict_on_structure_efs_par(
-                atoms, self.gp_model, write_to_structure=False)
+                atoms, self.gp_model, n_cpus=32, write_to_structure=False)
         else:
             res = predict_on_structure_efs(
                 atoms, self.gp_model, write_to_structure=False)

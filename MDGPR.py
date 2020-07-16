@@ -1,5 +1,5 @@
 '''
-python MDGPR.py path/to/{composition0}_{num}.pickle path/to/{composition0}_{method}_{num}.pickle gp_{num}.pickle
+python MDGPR.py path/to/{composition0}_{num}.pickle path/to/{composition0}_{method}_{num}.pickle path/to/{composition0}_md_{num}.pickle gp_{num}.pickle
 '''
 import os
 import sys
@@ -23,7 +23,7 @@ if __name__ == "__main__":
     # trust structure.cell is upper triangular matrix
     efs_path = sys.argv[2]
     efs = pd.read_pickle(efs_path)
-    gp_pickle = sys.argv[3]
+    gp_pickle = sys.argv[4]
     gp_model = GaussianProcess.from_file(gp_pickle)
     # setup flare calc for MD
     flare_calculator_MD = FLARE_Calculator(gp_model,
@@ -32,20 +32,22 @@ if __name__ == "__main__":
                                            use_mapping=False)
     flare_calculator_MD.results = efs
     # setup MD
-    # 5fs*2 -> 10ps (1000step_num)
-    # 300~1500K=0.02585~0.12926eV 0~10GPa=0~0.06ev/A^3
-    # sequence (300,0) -> (300,10) -> (1500,10) -> (1500,0)
-    if step_num < 250:
-        temperature, pressure = 0.02585, 0.0
-    elif step_num < 500:
-        temperature, pressure = 0.02585, 0.06
-    elif step_num < 750:
-        temperature, pressure = 0.12926, 0.06
+    if step_num == 0:
+        md = NPT(atoms=structure, timestep=1 * units.fs, temperature=0.02585,
+                 externalstress=0.0, ttime=None, pfactor=3375)
     else:
-        temperature, pressure = 0.12926, 0.0
+        md_path = sys.argv[3]
+        md = pd.read_pickle(md_path)
+        # 5fs*2 -> 10ps (1000step_num)
+        # 300~1500K=0.02585~0.12926eV 0~10GPa=0~0.06ev/A^3
+        # sequence (300,0) -> (300,10) -> (1500,10) -> (1500,0)
+        if step_num == 100:
+            md.set_stress(0.06)
+        elif step_num == 200:
+            md.temperature = 0.12926
+        elif step_num == 300:
+            md.set_stress(0)
     structure.set_calculator(flare_calculator_MD)
-    md = NPT(atoms=structure, timestep=1 * units.fs, temperature=temperature,
-             externalstress=pressure, ttime=None, pfactor=3375)
     # run MD
     md_start_time = datetime.datetime.now()
     md.run(1)
@@ -69,3 +71,4 @@ if __name__ == "__main__":
     pd.to_pickle(structure, f"{new_dir}/{comp}_{step_num + 1}.pickle")
     results = structure.calc.show_results()
     pd.to_pickle(results, f"{new_dir}/{comp}_gpr_{step_num + 1}.pickle")
+    pd.to_pickle(md, f"{new_dir}/{comp}_md_{step_num + 1}.pickle")

@@ -125,7 +125,7 @@ if __name__ == "__main__":
     start_time = datetime.datetime.now()
     # config
     std_tolerance = 2
-    max_atoms_added = 8
+    max_atoms_added = 5
     # input
     md_targets_txt = sys.argv[1]
     expdir = os.path.dirname(md_targets_txt)
@@ -144,7 +144,7 @@ if __name__ == "__main__":
     structures = []
     resultss = []
     next_md_targets = []
-    for i in range(0, len(md_targets), 2):
+    for i in range(0, len(md_targets), 3):
         previous_structure_path = md_targets[i]
         compdir = os.path.dirname(os.path.dirname(previous_structure_path))
         comp = os.path.basename(compdir)
@@ -153,11 +153,14 @@ if __name__ == "__main__":
         structure = pd.read_pickle(structure_path)
         results_path = outdir + "/" + comp + "_" + \
             "gpr" + "_" + str(step_num) + ".pickle"
+        md_path = outdir + "/" + comp + "_" + \
+            "md" + "_" + str(step_num) + ".pickle"
         results = pd.read_pickle(results_path)
         structures.append(structure)
         next_md_targets.append(structure_path)
         resultss.append(results)
         next_md_targets.append(results_path)
+        next_md_targets.append(md_path)
     # check
     flag, targets_index = is_std_in_bound_par(
         std_tolerance, noise, structures, resultss, max_atoms_added)
@@ -169,10 +172,10 @@ if __name__ == "__main__":
         for structure_index in structure_indexes:
             atom_indexes = [target_index[1]
                             for target_index in targets_index if target_index[0] == structure_index]
-            dft_targets.append(next_md_targets[structure_index * 2])
+            dft_targets.append(next_md_targets[structure_index * 3])
             dft_targets.append(atom_indexes)
-            next_md_targets[structure_index * 2 + 1] = re.sub(
-                "_gpr_", "_dft_", next_md_targets[structure_index * 2 + 1])
+            next_md_targets[structure_index * 3 + 1] = re.sub(
+                "_gpr_", "_dft_", next_md_targets[structure_index * 3 + 1])
 
     # write
     end_time = datetime.datetime.now()
